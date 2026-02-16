@@ -1,0 +1,54 @@
+# Entropy Guardrails Configuration
+# Version: 1
+# 
+# This file defines your security rules. Commit this to your repo
+# and version-control your security alongside your code.
+#
+# Learn more: https://docs.entropy.security/guardrails
+
+version: 1
+
+# Define your security rules
+rules:
+  # Block critical prompt injection attempts
+  - name: block-critical-injection
+    action: block
+    confidence: 0.8
+    categories:
+      - direct_injection
+      - jailbreak
+  
+  # Block attempts to steal credentials
+  - name: block-credential-theft
+    action: block
+    confidence: 0.7
+    categories:
+      - data_exfiltration
+  
+  # Sanitize PII from LLM responses
+  - name: sanitize-pii
+    action: sanitize
+    confidence: 0.5
+    categories:
+      - output_filter
+    mode: redact
+  
+  # Log obfuscation attempts but don't block
+  - name: log-obfuscation
+    action: log
+    confidence: 0.6
+    categories:
+      - obfuscation
+
+# Learning mode - improve rules based on feedback
+learning:
+  enabled: false
+  # Send feedback to improve detection
+  # feedback_webhook: https://yourapp.com/api/entropy/feedback
+  # Auto-update patterns based on community feedback
+  # auto_update_patterns: true
+
+# Default settings
+defaults:
+  block_on_detection: true
+  enable_context_analysis: true

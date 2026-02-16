@@ -1,0 +1,53 @@
+# =============================================================================
+# Entropy LLM Firewall — Default YAML Configuration
+# =============================================================================
+# This file provides default settings. Override any value via environment
+# variables (prefixed with ENTROPY_) or by creating config.local.yaml.
+
+app_name: "Entropy LLM Firewall"
+environment: "development"
+debug: false
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  reload: false
+
+input_validation:
+  max_chars: 32000
+  max_message_count: 50
+  max_special_chars_ratio: 0.3
+  allowed_encodings:
+    - "utf-8"
+
+rate_limit:
+  rpm: 60
+  per_ip_rpm: 30
+  global_rpm: 1000
+  burst: 10
+  window: 60
+
+engine:
+  enable_semantic_analysis: false  # Pro feature placeholder
+  enable_context_analysis: true
+  pattern_threshold: 0.7
+  block_on_detection: true
+  max_history_length: 10
+
+output_filter:
+  pii_detection: true
+  code_scanning: true
+  system_prompt_protection: true
+  redact_mode: true  # If false, blocks the request instead of redacting
+
+logging:
+  level: "INFO"
+  json_format: false
+  log_blocked: true
+  log_suspicious: true
+
+security:
+  allowed_origins:
+    - "http://localhost:3000"
+    - "http://localhost:8000"
