@@ -75,6 +75,34 @@ class EngineSettings(BaseSettings):
         default=10, description="Max conversation turns for context analysis"
     )
 
+    # Recursive decoding (obfuscation resistance)
+    enable_recursive_decoding: bool = Field(
+        default=True, description="Enable multi-layer encoding detection and decoding"
+    )
+    max_decode_depth: int = Field(
+        default=5, description="Max recursive decoding iterations"
+    )
+
+    # Indirect prompt injection detection
+    enable_indirect_injection_detection: bool = Field(
+        default=True, description="Scan tool/function outputs for hidden injections"
+    )
+    fetch_urls_for_analysis: bool = Field(
+        default=False, description="Fetch URL content for injection scanning (adds latency)"
+    )
+
+    # Semantic analysis (local intelligence layer)
+    semantic_model_path: str = Field(
+        default="~/.entropy/models/entropy-classifier.onnx",
+        description="Path to ONNX semantic classifier model"
+    )
+    semantic_confidence_threshold: float = Field(
+        default=0.75, description="Minimum confidence for semantic threat classification"
+    )
+    semantic_model_url: str = Field(
+        default="", description="URL to download the ONNX model from"
+    )
+
     @field_validator("pattern_threshold")
     @classmethod
     def _validate_threshold(cls, v: float) -> float:

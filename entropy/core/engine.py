@@ -5,6 +5,8 @@ Combines:
 2. Context Analysis  (heuristic, multi-turn)
 3. Input Validation  (structural)
 4. Semantic Analysis (LLM-based intent, optional)
+5. Input Sanitisation (recursive multi-layer decoding)
+6. Indirect Prompt Injection Detection
 
 and produces a final EntropyVerdict for each request.
 """
@@ -18,10 +20,12 @@ import structlog
 
 from entropy.config import get_settings
 from entropy.core.context_analyzer import ContextAnalyzer
+from entropy.core.indirect_injection_detector import IndirectInjectionDetector
+from entropy.core.input_sanitizer import InputSanitizer
 from entropy.core.input_validator import InputValidator
 from entropy.core.output_filter import OutputFilter
 from entropy.core.pattern_matcher import PatternMatcher
-from entropy.core.semantic_analyzer import SemanticAnalyzer  # Added
+from entropy.core.semantic_analyzer import SemanticAnalyzer
 from entropy.models.schemas import (
     ChatCompletionRequest,
     EntropyStatus,
@@ -127,6 +131,8 @@ class EntropyEngine:
         input_validator: InputValidator | None = None,
         output_filter: OutputFilter | None = None,
         semantic_analyzer: SemanticAnalyzer | None = None,
+        input_sanitizer: InputSanitizer | None = None,
+        indirect_detector: IndirectInjectionDetector | None = None,
     ) -> None:
         settings = get_settings()
 
@@ -139,10 +145,19 @@ class EntropyEngine:
             enable_pii=settings.output_filter.pii_detection,
             enable_code=settings.output_filter.code_scanning,
         )
-        # Added semantic analyzer
         self.semantic_analyzer = semantic_analyzer or SemanticAnalyzer(
             enabled=settings.engine.enable_semantic_analysis
         )
+        self.input_sanitizer = input_sanitizer or InputSanitizer(
+            max_depth=settings.engine.max_decode_depth,
+            enabled=settings.engine.enable_recursive_decoding,
+        )
+        self.indirect_detector = indirect_detector or IndirectInjectionDetector(
+            pattern_matcher=self.pattern_matcher,
+            input_sanitizer=self.input_sanitizer,
+            fetch_urls=settings.engine.fetch_urls_for_analysis,
+        )
+        self._indirect_injection_enabled = settings.engine.enable_indirect_injection_detection
 
         self._threshold = settings.engine.pattern_threshold
         self._block = settings.engine.block_on_detection
@@ -153,6 +168,8 @@ class EntropyEngine:
             patterns=self.pattern_matcher.get_pattern_count(),
             context_enabled=self._context_enabled,
             semantic_enabled=self.semantic_analyzer.enabled,
+            recursive_decoding=self.input_sanitizer.enabled,
+            indirect_injection=self._indirect_injection_enabled,
             block_on_detection=self._block,
         )
 
@@ -196,8 +213,37 @@ class EntropyEngine:
         # 2. Extract text for analysis
         text = self._extract_text(request)
 
-        # 3. Pattern matching
-        is_malicious, pat_conf, detections, pat_level = self.pattern_matcher.analyze(text)
+        # 2.5. Recursive decoding (obfuscation resistance)
+        sanitized_input = self.input_sanitizer.sanitize(text)
+        if sanitized_input.was_obfuscated:
+            threats.append(
+                ThreatInfo(
+                    category="obfuscation",
+                    name="multi_layer_encoding",
+                    threat_level=ThreatLevel.MEDIUM,
+                    confidence=min(0.3 * sanitized_input.layers_decoded, 0.9),
+                    details=(
+                        f"Decoded {sanitized_input.layers_decoded} encoding layer(s): "
+                        f"{', '.join(sanitized_input.encodings_found)}"
+                    ),
+                )
+            )
+            max_conf = max(max_conf, min(0.3 * sanitized_input.layers_decoded, 0.9))
+            if _LEVEL_PRIORITY[ThreatLevel.MEDIUM] > _LEVEL_PRIORITY[max_level]:
+                max_level = ThreatLevel.MEDIUM
+        analysis_text = sanitized_input.decoded
+
+        # 2.7. Indirect prompt injection check (tool/function outputs)
+        if self._indirect_injection_enabled:
+            indirect_threats = self.indirect_detector.analyze(request)
+            threats.extend(indirect_threats)
+            for t in indirect_threats:
+                max_conf = max(max_conf, t.confidence)
+                if _LEVEL_PRIORITY[t.threat_level] > _LEVEL_PRIORITY[max_level]:
+                    max_level = t.threat_level
+
+        # 3. Pattern matching (on decoded text)
+        is_malicious, pat_conf, detections, pat_level = self.pattern_matcher.analyze(analysis_text)
         
         for d in detections:
             threats.append(
@@ -246,7 +292,7 @@ class EntropyEngine:
                     max_level = ctx_level
 
         # 5. Semantic Analysis (Pro feature / stub) - Async
-        sem_result = await self.semantic_analyzer.analyze(text, history=conversation_history)
+        sem_result = await self.semantic_analyzer.analyze(analysis_text, history=conversation_history)
         if sem_result.is_malicious:
             threats.append(
                 ThreatInfo(
