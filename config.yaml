@@ -29,11 +29,24 @@ rate_limit:
   window: 60
 
 engine:
-  enable_semantic_analysis: false  # Pro feature placeholder
+  enable_semantic_analysis: true   # Now powered by local intelligence layer
   enable_context_analysis: true
   pattern_threshold: 0.7
   block_on_detection: true
   max_history_length: 10
+
+  # Recursive decoding (obfuscation resistance)
+  enable_recursive_decoding: true
+  max_decode_depth: 5
+
+  # Indirect prompt injection detection
+  enable_indirect_injection_detection: true
+  fetch_urls_for_analysis: false   # Enable to fetch+scan URLs (adds latency)
+
+  # Semantic analysis (local intelligence layer)
+  semantic_model_path: "~/.entropy/models/entropy-classifier.onnx"
+  semantic_confidence_threshold: 0.75
+  semantic_model_url: ""           # Set to download ONNX model on first use
 
 output_filter:
   pii_detection: true

@@ -53,9 +53,15 @@ dev = [
     "pre-commit>=3.6.0",
     "fakeredis>=2.21.0",
 ]
+semantic = [
+    "onnxruntime>=1.17.0",
+    "tokenizers>=0.15.0",
+    "numpy>=1.24.0",
+]
 
 [project.scripts]
 entropy = "entropy.cli.main:app"
+entropy-download-model = "entropy.core.model_downloader:download_model_cli"
 
 [project.urls]
 Homepage = "https://github.com/paarthbhatt/entropy-firewall"
