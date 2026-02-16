@@ -1,0 +1,70 @@
+# =============================================================================
+# Entropy LLM Firewall — Docker Compose (Development)
+# =============================================================================
+version: "3.9"
+
+services:
+  # ---------- PostgreSQL ----------
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: entropy
+      POSTGRES_USER: entropy
+      POSTGRES_PASSWORD: entropy_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U entropy" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---------- Redis ----------
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---------- Entropy API ----------
+  entropy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ENTROPY_ENVIRONMENT=development
+      - ENTROPY_DEBUG=true
+      - ENTROPY_DB_HOST=postgres
+      - ENTROPY_DB_PORT=5432
+      - ENTROPY_DB_NAME=entropy
+      - ENTROPY_DB_USER=entropy
+      - ENTROPY_DB_PASSWORD=entropy_dev_password
+      - ENTROPY_REDIS_URL=redis://redis:6379/0
+      - ENTROPY_MASTER_API_KEY=dev-master-key-change-in-production
+      - ENTROPY_OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health').raise_for_status()" ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres_data:
+  redis_data:

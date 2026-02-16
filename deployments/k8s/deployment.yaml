@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: entropy-firewall
+  namespace: entropy
+  labels:
+    app: entropy-firewall
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: entropy-firewall
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: entropy-firewall
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: entropy
+          image: entropy-firewall:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: ENTROPY_ENVIRONMENT
+              value: "production"
+            - name: ENTROPY_LOG_LEVEL
+              value: "INFO"
+            # Database
+            - name: ENTROPY_DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: entropy-secrets
+                  key: db-host
+            - name: ENTROPY_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: entropy-secrets
+                  key: db-password
+            # Redis
+            - name: ENTROPY_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: entropy-secrets
+                  key: redis-url
+            # API Keys
+            - name: ENTROPY_MASTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: entropy-secrets
+                  key: master-api-key
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: entropy-secrets
+                  key: openai-api-key
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: entropy-firewall
+  namespace: entropy
+  labels:
+    app: entropy-firewall
+spec:
+  type: ClusterIP
+  selector:
+    app: entropy-firewall
+  ports:
+    - port: 80
+      targetPort: 8000
+      name: http
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: entropy-hpa
+  namespace: entropy
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: entropy-firewall
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
