@@ -114,8 +114,8 @@ def create_app() -> FastAPI:
     )
 
     # -- Custom middleware (outer → inner execution order) --
-    app.add_middleware(BaseHTTPMiddleware, dispatch=RequestLoggingMiddleware().dispatch)
-    app.add_middleware(BaseHTTPMiddleware, dispatch=TimingMiddleware().dispatch)
+    app.add_middleware(RequestLoggingMiddleware)
+    app.add_middleware(TimingMiddleware)
 
     # -- Routes --
     app.include_router(health.router)
