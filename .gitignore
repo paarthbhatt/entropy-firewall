@@ -58,3 +58,17 @@ md files, not to be committed/
 
 # Tool directories
 .qoder/
+.claude/
+
+# Lock files (generated — commit uv.lock but not others)
+node_modules/
+
+# uv
+.python-version
+
+# Windows artifacts
+nul
+Thumbs.db
+
+# Build artifacts (local only)
+entropy_firewall.egg-info/
