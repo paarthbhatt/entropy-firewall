@@ -26,11 +26,13 @@ async def get_pool() -> asyncpg.Pool:
 async def create_pool() -> asyncpg.Pool:
     """Create a new connection pool from settings."""
     settings = get_settings()
+    ssl_mode = "require" if str(settings.db.host).endswith("supabase.co") else None
     pool = await asyncpg.create_pool(
         dsn=settings.db.dsn,
         min_size=settings.db.min_connections,
         max_size=settings.db.max_connections,
         command_timeout=30,
+        ssl=ssl_mode,
     )
     logger.info(
         "Database pool created",

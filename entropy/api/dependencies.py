@@ -94,7 +94,10 @@ def get_provider() -> Any:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="OPENAI_API_KEY is not configured",
         )
-    return OpenAIProvider(api_key=settings.openai_api_key)
+    return OpenAIProvider(
+        api_key=settings.openai_api_key,
+        base_url=settings.openai_base_url,
+    )
 
 
 def get_request_log_repo(

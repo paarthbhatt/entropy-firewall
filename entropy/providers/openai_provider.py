@@ -21,8 +21,8 @@ logger = structlog.get_logger(__name__)
 class OpenAIProvider(BaseProvider):
     """Adapter for the OpenAI Chat Completions API."""
 
-    def __init__(self, api_key: str) -> None:
-        self._client = openai.AsyncOpenAI(api_key=api_key)
+    def __init__(self, api_key: str, base_url: Optional[str] = None) -> None:
+        self._client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
 
     @property
     def name(self) -> str:

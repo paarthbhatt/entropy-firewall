@@ -24,6 +24,7 @@ env/
 .env
 .env.local
 .env.production
+config.local.yaml
 
 # Testing
 htmlcov/
