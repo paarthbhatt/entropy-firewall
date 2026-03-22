@@ -6,6 +6,7 @@ Use these in Render -> Service -> Environment.
 
 - `ENTROPY_ENVIRONMENT=production`
 - `ENTROPY_DEBUG=false`
+- `ENTROPY_ENABLE_YAML_CONFIG=false`
 - `ENTROPY_ENFORCE_DEPENDENCIES=true`
 - `ENTROPY_MASTER_API_KEY=<generate-strong-key>`
 - `ENTROPY_CORS_ORIGINS=["https://<your-vercel-domain>"]`

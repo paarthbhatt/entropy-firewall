@@ -178,6 +178,10 @@ class Settings(BaseSettings):
     version: str = Field(default="0.1.0")
     environment: str = Field(default="development")
     debug: bool = Field(default=False)
+    enable_yaml_config: bool = Field(
+        default=True,
+        description="Load YAML config files (config.yaml/config.local.yaml)",
+    )
     enforce_dependencies: bool = Field(
         default=False,
         description="Fail startup when Redis/DB is unavailable",
@@ -253,7 +257,18 @@ def get_settings() -> Settings:
 
     Merges YAML config (if found) with env vars. Env vars always win.
     """
+    base = Settings()
+    if not base.enable_yaml_config:
+        return base
+
     yaml_data = _load_yaml_config()
-    # Pydantic Settings priority: __init__ kwargs > env vars > env_file > field default
-    # So we pass yaml_data as kwargs
-    return Settings(**yaml_data)
+    if not yaml_data:
+        return base
+
+    # YAML applies only to values not set by env/.env at runtime.
+    merged = base.model_dump()
+    for key, value in yaml_data.items():
+        if key not in base.model_fields_set:
+            merged[key] = value
+
+    return Settings(**merged)

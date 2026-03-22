@@ -12,6 +12,8 @@ services:
         value: production
       - key: ENTROPY_DEBUG
         value: "false"
+      - key: ENTROPY_ENABLE_YAML_CONFIG
+        value: "false"
       - key: ENTROPY_ENFORCE_DEPENDENCIES
         value: "true"
       - key: ENTROPY_CORS_ORIGINS
