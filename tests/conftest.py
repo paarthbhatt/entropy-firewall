@@ -26,7 +26,7 @@ def pattern_matcher():
 @pytest.fixture
 def context_analyzer():
     """Fresh ContextAnalyzer instance."""
-    from entropy.core.context_analyzer import ContextAnalyzer
+    from entropy_pro.core.context_analyzer import ContextAnalyzer  # type: ignore[import]
 
     return ContextAnalyzer(max_history=10)
 

@@ -6,6 +6,7 @@ Wires up all routes, middleware, lifespan events, and error handlers.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import logging
 
 import redis.asyncio as aioredis
 import structlog
@@ -25,6 +26,7 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # Lifespan
 # ---------------------------------------------------------------------------
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -63,6 +65,7 @@ async def lifespan(app: FastAPI):
         app.state.db_pool = None
 
     # Configure structlog
+    log_level = getattr(logging, settings.logging.level.upper(), logging.INFO)
     structlog.configure(
         processors=[
             structlog.processors.TimeStamper(fmt="iso"),
@@ -71,9 +74,7 @@ async def lifespan(app: FastAPI):
             if not settings.logging.json_format
             else structlog.processors.JSONRenderer(),
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(
-            structlog.get_level_from_name(settings.logging.level)
-        ),
+        wrapper_class=structlog.make_filtering_bound_logger(log_level),
     )
 
     yield
@@ -90,6 +91,7 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 # Application factory
 # ---------------------------------------------------------------------------
+
 
 def create_app() -> FastAPI:
     """Build and return the FastAPI application."""

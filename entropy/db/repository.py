@@ -19,6 +19,10 @@ class RequestLogRepository:
     def __init__(self, pool: asyncpg.Pool) -> None:
         self.pool = pool
 
+    @property
+    def enabled(self) -> bool:
+        return self.pool is not None
+
     async def create(
         self,
         *,
@@ -41,6 +45,8 @@ class RequestLogRepository:
     ) -> str:
         """Insert a request log entry. Returns the log ID."""
         log_id = str(uuid.uuid4())
+        if self.pool is None:
+            return log_id
         async with self.pool.acquire() as conn:
             await conn.execute(
                 """
@@ -76,12 +82,105 @@ class RequestLogRepository:
             )
         return log_id
 
+    async def dashboard_summary(self, *, hours: int = 24) -> dict[str, Any]:
+        """Aggregate request/security summary for dashboard views."""
+        if self.pool is None:
+            return {
+                "window_hours": hours,
+                "total_requests": 0,
+                "blocked_requests": 0,
+                "sanitized_requests": 0,
+                "blocked_rate": 0.0,
+                "avg_latency_ms": 0.0,
+                "avg_processing_ms": 0.0,
+                "last_event_at": None,
+            }
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                WITH scoped AS (
+                    SELECT *
+                    FROM request_logs
+                    WHERE created_at >= NOW() - ($1::text || ' hours')::interval
+                )
+                SELECT
+                    COUNT(*)::bigint AS total_requests,
+                    COUNT(*) FILTER (WHERE status = 'blocked')::bigint AS blocked_requests,
+                    COUNT(*) FILTER (WHERE status = 'sanitized')::bigint AS sanitized_requests,
+                    COALESCE(AVG(total_ms), 0)::double precision AS avg_latency_ms,
+                    COALESCE(AVG(processing_ms), 0)::double precision AS avg_processing_ms,
+                    COALESCE(MAX(created_at), NOW()) AS last_event_at
+                FROM scoped
+                """,
+                str(hours),
+            )
+
+            total_requests = int(row["total_requests"] or 0)
+            blocked_requests = int(row["blocked_requests"] or 0)
+            sanitized_requests = int(row["sanitized_requests"] or 0)
+            avg_latency_ms = float(row["avg_latency_ms"] or 0)
+            avg_processing_ms = float(row["avg_processing_ms"] or 0)
+            blocked_rate = (blocked_requests / total_requests) if total_requests > 0 else 0.0
+
+            return {
+                "window_hours": hours,
+                "total_requests": total_requests,
+                "blocked_requests": blocked_requests,
+                "sanitized_requests": sanitized_requests,
+                "blocked_rate": round(blocked_rate, 4),
+                "avg_latency_ms": round(avg_latency_ms, 2),
+                "avg_processing_ms": round(avg_processing_ms, 2),
+                "last_event_at": row["last_event_at"].isoformat() if row["last_event_at"] else None,
+            }
+
+    async def top_threat_categories(
+        self, *, hours: int = 24, limit: int = 8
+    ) -> list[dict[str, Any]]:
+        """Return top threat categories from logged threat payloads."""
+        if self.pool is None:
+            return []
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                WITH scoped AS (
+                    SELECT threats_json
+                    FROM request_logs
+                    WHERE created_at >= NOW() - ($1::text || ' hours')::interval
+                ),
+                exploded AS (
+                    SELECT jsonb_array_elements(threats_json) AS threat
+                    FROM scoped
+                )
+                SELECT
+                    COALESCE(threat ->> 'category', 'unknown') AS category,
+                    COUNT(*)::bigint AS count
+                FROM exploded
+                GROUP BY category
+                ORDER BY count DESC
+                LIMIT $2
+                """,
+                str(hours),
+                limit,
+            )
+
+            return [
+                {
+                    "category": str(row["category"]),
+                    "count": int(row["count"]),
+                }
+                for row in rows
+            ]
+
 
 class SecurityEventRepository:
     """Repository for security events."""
 
     def __init__(self, pool: asyncpg.Pool) -> None:
         self.pool = pool
+
+    @property
+    def enabled(self) -> bool:
+        return self.pool is not None
 
     async def create(
         self,
@@ -94,6 +193,8 @@ class SecurityEventRepository:
     ) -> str:
         """Insert a security event. Returns the event ID."""
         event_id = str(uuid.uuid4())
+        if self.pool is None:
+            return event_id
         async with self.pool.acquire() as conn:
             await conn.execute(
                 """
@@ -119,6 +220,8 @@ class APIKeyRepository:
 
     async def find_by_prefix(self, key_prefix: str) -> Optional[dict[str, Any]]:
         """Look up an API key record by its prefix."""
+        if self.pool is None:
+            return None
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
@@ -144,6 +247,8 @@ class APIKeyRepository:
         rate_limit_rpm: Optional[int] = None,
     ) -> str:
         """Insert a new API key. Returns the key ID."""
+        if self.pool is None:
+            raise RuntimeError("Database pool is not available")
         key_id = str(uuid.uuid4())
         async with self.pool.acquire() as conn:
             await conn.execute(
@@ -162,6 +267,8 @@ class APIKeyRepository:
 
     async def deactivate(self, key_id: str) -> bool:
         """Deactivate an API key."""
+        if self.pool is None:
+            return False
         async with self.pool.acquire() as conn:
             result = await conn.execute(
                 "UPDATE api_keys SET is_active = FALSE WHERE id = $1",

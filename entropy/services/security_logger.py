@@ -25,23 +25,24 @@ class SecurityLogger:
         self,
         *,
         client_ip: str,
-        threats: list[dict[str, Any]],
+        threats: list[dict[str, Any] | Any],
         confidence: float,
         request_log_id: Optional[str] = None,
     ) -> None:
         """Log a blocked attack."""
+        normalized_threats = [t.model_dump() if hasattr(t, "model_dump") else t for t in threats]
         logger.warning(
             "ATTACK BLOCKED",
             client_ip=client_ip,
             confidence=confidence,
-            threat_count=len(threats),
-            threats=threats[:5],
+            threat_count=len(normalized_threats),
+            threats=normalized_threats[:5],
         )
         if self.repo:
             await self.repo.create(
                 event_type="attack_blocked",
                 severity="high",
-                details={"confidence": confidence, "threats": threats[:10]},
+                details={"confidence": confidence, "threats": normalized_threats[:10]},
                 client_ip=client_ip,
                 request_log_id=request_log_id,
             )

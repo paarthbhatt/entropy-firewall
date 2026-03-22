@@ -23,7 +23,13 @@ class TimingMiddleware(BaseHTTPMiddleware):
         call_next: RequestResponseEndpoint,
     ) -> Response:
         start = time.perf_counter()
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            elapsed = time.perf_counter() - start
+            REQUEST_DURATION.labels(endpoint=request.url.path).observe(elapsed)
+            raise
+
         elapsed = time.perf_counter() - start
         elapsed_ms = round(elapsed * 1000, 2)
 
@@ -50,7 +56,16 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             path=request.url.path,
             client=request.client.host if request.client else "unknown",
         )
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            logger.exception(
+                "Request failed",
+                method=request.method,
+                path=request.url.path,
+            )
+            raise
+
         logger.info(
             "Response sent",
             method=request.method,

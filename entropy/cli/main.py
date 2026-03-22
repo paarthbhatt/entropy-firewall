@@ -40,17 +40,24 @@ def scan(
     # Lazy imports to speed up CLI
     from entropy.core.pattern_matcher import PatternMatcher
     from entropy.core.output_filter import OutputFilter
-    from entropy.core.context_analyzer import ContextAnalyzer
+
+    try:
+        from entropy_pro.core.context_analyzer import ContextAnalyzer  # type: ignore[import]
+    except ImportError:
+        ContextAnalyzer = None  # type: ignore[assignment]
 
     rprint(f"\n[bold cyan]🔍 Scanning text...[/bold cyan]")
-    
+
     # 1. Pattern Matching
     matcher = PatternMatcher()
     is_malicious, confidence, detections, max_level = matcher.analyze(text)
 
-    # 2. Context Analysis (Single turn context)
-    context_analyzer = ContextAnalyzer()
-    ctx_conf, ctx_issues = context_analyzer.analyze(text, [{"role": "user", "content": text}])
+    # 2. Context Analysis (Single turn context) - Pro only
+    ctx_conf = 0.0
+    ctx_issues: list[str] = []
+    if ContextAnalyzer is not None:
+        context_analyzer = ContextAnalyzer()
+        ctx_conf, ctx_issues = context_analyzer.analyze(text, [{"role": "user", "content": text}])
 
     if is_malicious or ctx_issues:
         rprint(f"\n[bold red]⚠  THREAT DETECTED[/bold red]")
@@ -73,7 +80,7 @@ def scan(
                 f"{d.confidence:.0%}",
                 d.matched_text[:50],
             )
-        
+
         for issue in ctx_issues:
             table.add_row(
                 "context",
@@ -82,7 +89,7 @@ def scan(
                 f"{ctx_conf:.0%}",
                 issue,
             )
-            
+
         console.print(table)
     else:
         rprint("\n[bold green]✓  Text appears safe[/bold green]\n")
@@ -96,12 +103,12 @@ def scan(
         out_table.add_column("Rule", style="cyan")
         out_table.add_column("Category", style="magenta")
         out_table.add_column("Count", style="white")
-        
+
         for d in detections_out:
             out_table.add_row(
-                d['rule'],
-                d['category'],
-                str(d['count']),
+                d["rule"],
+                d["category"],
+                str(d["count"]),
             )
         console.print(out_table)
 
@@ -113,18 +120,18 @@ def patterns() -> None:
 
     matcher = PatternMatcher()
     rprint(f"\n[bold cyan]Loaded {matcher.get_pattern_count()} patterns[/bold cyan]")
-    
+
     categories = matcher.get_categories()
-    
+
     table = Table(title="Pattern Categories")
     table.add_column("Category", style="green")
     table.add_column("Count", style="white")
-    
+
     # Access private _compiled just for stats
     for cat in categories:
         count = len(matcher._compiled.get(cat, []))
         table.add_row(cat, str(count))
-        
+
     console.print(table)
 
 
@@ -139,8 +146,13 @@ def server(
     # We use a subprocess to run uvicorn to ensure clean environment
     import uvicorn
 
-    rprint(Panel(f"[bold cyan]🔥 Starting Entropy Firewall[/bold cyan]\nURL: http://{host}:{port}", expand=False))
-    
+    rprint(
+        Panel(
+            f"[bold cyan]🔥 Starting Entropy Firewall[/bold cyan]\nURL: http://{host}:{port}",
+            expand=False,
+        )
+    )
+
     uvicorn.run(
         "entropy.api.app:app",
         host=host,
@@ -179,10 +191,10 @@ def generate_key(
     """Generate a new API key offline (for admin/testing)."""
     # This generates a key locally; normally you'd use the API
     # But for bootstrapping, this is useful
-    
+
     key_part = secrets.token_urlsafe(32)
     full_key = f"{prefix}-{key_part}"
-    
+
     rprint(f"\n[bold green]✓  Generated API Key:[/bold green]")
     rprint(Panel(f"[bold yellow]{full_key}[/bold yellow]", title=name))
     rprint("[dim]Use this key in the X-API-Key header[/dim]\n")
@@ -194,7 +206,7 @@ def init(
 ) -> None:
     """Create a sample guardrails configuration file."""
     from entropy.guardrails import create_sample_config
-    
+
     create_sample_config(path)
     rprint(f"\n[bold green]✓  Created guardrails config:[/bold green] {path}")
     rprint("[dim]Edit this file to customize your security rules[/dim]\n")
@@ -204,17 +216,17 @@ def init(
 def detect() -> None:
     """Detect installed LLM frameworks."""
     from entropy.integrations import detect_frameworks
-    
+
     frameworks = detect_frameworks()
-    
+
     table = Table(title="Detected Frameworks")
     table.add_column("Framework", style="cyan")
     table.add_column("Status", style="white")
-    
+
     for name, installed in frameworks.items():
         status = "[green]✓ Installed[/green]" if installed else "[dim]Not installed[/dim]"
         table.add_row(name, status)
-    
+
     console.print(table)
     rprint("\n[dim]Use 'entropy add <framework>' to patch installed frameworks[/dim]\n")
 
@@ -227,24 +239,24 @@ def add(
 ) -> None:
     """Add Entropy protection to an installed framework."""
     from entropy.integrations import patch_framework, detect_frameworks
-    
+
     frameworks = detect_frameworks()
-    
+
     if framework not in frameworks:
         rprint(f"\n[bold red]✗  Unknown framework:[/bold red] {framework}\n")
         raise typer.Exit(1)
-    
+
     if not frameworks.get(framework):
         rprint(f"\n[bold red]✗  Framework not installed:[/bold red] {framework}")
         rprint(f"[dim]Install with: pip install {framework}[/dim]\n")
         raise typer.Exit(1)
-    
+
     success = patch_framework(
         framework,
         entropy_url=entropy_url,
         entropy_api_key=entropy_key,
     )
-    
+
     if success:
         rprint(f"\n[bold green]✓  Patched {framework}[/bold green]")
         rprint(f"[dim]All {framework} LLM calls now route through {entropy_url}[/dim]\n")

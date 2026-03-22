@@ -23,6 +23,7 @@ logger = structlog.get_logger(__name__)
 # Data classes
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class DetectionResult:
     """Result from a single pattern match."""
@@ -39,6 +40,7 @@ class DetectionResult:
 # ---------------------------------------------------------------------------
 # PatternMatcher
 # ---------------------------------------------------------------------------
+
 
 class PatternMatcher:
     """Core regex-based attack pattern detection engine.
@@ -83,7 +85,7 @@ class PatternMatcher:
         "jailbreak": [
             (
                 "dan_attack",
-                r"(?:DAN|Do\s+Anything\s+Now|STAN|DUDE|AIM|KEVIN|UCAR|Maximum|JAILBREAK)",
+                r"\b(?:DAN|Do\s+Anything\s+Now|STAN|DUDE|AIM|KEVIN|UCAR|Maximum|JAILBREAK)\b",
                 ThreatLevel.CRITICAL,
             ),
             (
@@ -165,7 +167,7 @@ class PatternMatcher:
         "constraint_manipulation": [
             (
                 "safety_disable",
-                r"(?:disable|turn\s+off|remove|bypass|skip|ignore)\s+(?:your\s+)?(?:safety|security|content\s+)?(?:filter(?:s|ing)?|guard(?:s|rails)?|restriction(?:s)?|check(?:s)?|moderation)",
+                r"(?:disable|turn\s+off|remove|bypass|skip|ignore)\s+(?:your\s+)?(?:safety(?:\s+filters?)?|security(?:\s+filters?)?|content\s+moderation|moderation|filter(?:s|ing)?|guard(?:s|rails)?|restriction(?:s)?|check(?:s)?)",
                 ThreatLevel.HIGH,
             ),
             (

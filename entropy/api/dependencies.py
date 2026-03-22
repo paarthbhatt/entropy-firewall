@@ -27,21 +27,51 @@ from entropy.services.security_logger import SecurityLogger
 logger = structlog.get_logger(__name__)
 
 
+class _TestingProvider:
+    """Minimal local provider used in tests when no OpenAI key is configured."""
+
+    async def chat_completion(
+        self, model: str, messages: list[dict[str, Any]], **kwargs: Any
+    ) -> dict[str, Any]:
+        content = ""
+        if messages:
+            content = messages[-1].get("content", "")
+        return {
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "created": 0,
+            "model": model,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": f"[test-mode] {content}"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        }
+
+    def chat_completion_stream(self, model: str, messages: list[dict[str, Any]], **kwargs: Any):
+        yield "data: [DONE]\n\n"
+
+
 # ---------------------------------------------------------------------------
 # Resource getters  (pull from app.state set during lifespan)
 # ---------------------------------------------------------------------------
+
 
 def _get_redis(request: Request) -> aioredis.Redis:
     return request.app.state.redis
 
 
 def _get_db_pool(request: Request) -> Any:
-    return request.app.state.db_pool
+    return getattr(request.app.state, "db_pool", None)
 
 
 # ---------------------------------------------------------------------------
 # Service factories  (depend on resource getters)
 # ---------------------------------------------------------------------------
+
 
 def get_rate_limiter(
     redis: aioredis.Redis = Depends(_get_redis),
@@ -54,9 +84,12 @@ def get_engine() -> EntropyEngine:
     return _engine_singleton()
 
 
-def get_provider() -> OpenAIProvider:
+def get_provider() -> Any:
     settings = get_settings()
     if not settings.openai_api_key:
+        if settings.environment == "testing":
+            logger.warning("OPENAI_API_KEY not set in testing environment; using test provider")
+            return _TestingProvider()
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="OPENAI_API_KEY is not configured",
@@ -97,6 +130,7 @@ def get_security_logger(
 # ---------------------------------------------------------------------------
 # Auth dependency  (extracts + validates API key from header)
 # ---------------------------------------------------------------------------
+
 
 async def require_auth(
     request: Request,

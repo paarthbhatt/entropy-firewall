@@ -62,13 +62,15 @@ async def list_models() -> ModelListResponse:
         ]
     )
 
-@router.post("/v1/completions") 
+
+@router.post("/v1/completions")
 async def legacy_completions() -> Response:
     """Redirect legacy completions to chat completions."""
     return Response(
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
         headers={"Location": "/v1/chat/completions"},
     )
+
 
 @router.post("/v1/analyze", response_model=EntropyVerdict)
 async def analyze_content(
@@ -81,13 +83,12 @@ async def analyze_content(
     text = body.get("text", "")
     if not text:
         raise HTTPException(status_code=400, detail="Text field is required")
-        
+
     fake_request = ChatCompletionRequest(
-        model="analyze-only",
-        messages=[{"role": "user", "content": text}]
+        model="analyze-only", messages=[{"role": "user", "content": text}]
     )
     history = body.get("history", [])
-    
+
     return await engine.analyze_request(fake_request, conversation_history=history)
 
 
@@ -133,9 +134,7 @@ async def chat_completions(
             ).model_dump(),
             headers={
                 "Retry-After": str(
-                    rl_info.get("checks", {})
-                    .get("ip", {})
-                    .get("reset_after_seconds", 60)
+                    rl_info.get("checks", {}).get("ip", {}).get("reset_after_seconds", 60)
                 ),
             },
         )
@@ -166,7 +165,7 @@ async def chat_completions(
             content=ErrorResponse(
                 error="Request blocked by Entropy security analysis",
                 detail=f"Detected {len(verdict.threats_detected)} threat(s) "
-                       f"with confidence {verdict.confidence:.2f}",
+                f"with confidence {verdict.confidence:.2f}",
                 entropy=verdict,
                 action_suggestion=verdict.suggestion,
             ).model_dump(),
@@ -175,17 +174,25 @@ async def chat_completions(
     # ---- 3. Forward to LLM provider -----------------------------------------
     messages_dicts = [m.model_dump(exclude_none=True) for m in body.messages]
     extra_kwargs: dict[str, Any] = {}
-    for k in ("temperature", "max_tokens", "top_p", "presence_penalty",
-              "frequency_penalty", "stop", "user"):
+    for k in (
+        "temperature",
+        "max_tokens",
+        "top_p",
+        "presence_penalty",
+        "frequency_penalty",
+        "stop",
+        "user",
+    ):
         val = getattr(body, k, None)
         if val is not None:
             extra_kwargs[k] = val
 
     # Streaming Logic
     if body.stream:
+
         async def secure_stream() -> AsyncGenerator[str, None]:
             REQUESTS_TOTAL.labels(status="allowed", provider="openai").inc()
-            
+
             # Create a stream from provider
             # Note: real implementation needs async stream support in provider
             # converting sync iterator to async for compatibility in this example
@@ -194,7 +201,7 @@ async def chat_completions(
                 messages=messages_dicts,
                 **extra_kwargs,
             )
-            
+
             # First chunk: send usage/metadata (optional in OAI spec but good for us)
             # Then yield chunks
             for chunk in stream_iter:
@@ -240,16 +247,16 @@ async def chat_completions(
             if detections:
                 msg["content"] = filtered
                 output_sanitized = True
-                
+
                 # Convert detections to list of dicts if they aren't already
-                det_list = [d.model_dump() if hasattr(d, 'model_dump') else d for d in detections]
+                det_list = [d.model_dump() if hasattr(d, "model_dump") else d for d in detections]
                 sanitization_detections.extend(det_list)
-                
+
                 # Log metrics
                 for d in det_list:
-                    rule_name = d.get('rule', 'unknown') if isinstance(d, dict) else 'unknown'
+                    rule_name = d.get("rule", "unknown") if isinstance(d, dict) else "unknown"
                     OUTPUT_SANITIZATIONS.labels(rule=rule_name).inc()
-                
+
                 await sec_logger.log_pii_detected(
                     client_ip=client_ip,
                     detections=det_list,
@@ -269,7 +276,7 @@ async def chat_completions(
         # Calculate tokens if not provided
         prompt_tokens = raw_response.get("usage", {}).get("prompt_tokens", 0)
         completion_tokens = raw_response.get("usage", {}).get("completion_tokens", 0)
-        
+
         await log_repo.create(
             api_key_id=api_key_id if api_key_id != "master" else None,
             client_ip=client_ip,
@@ -281,7 +288,9 @@ async def chat_completions(
             threat_level=(
                 max(
                     (t.threat_level for t in verdict.threats_detected),
-                    key=lambda l: {"safe": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}.get(l.value, 0),
+                    key=lambda l: {"safe": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}.get(
+                        l.value, 0
+                    ),
                     default=ThreatLevel.SAFE,
                 ).value
                 if verdict.threats_detected
@@ -301,3 +310,39 @@ async def chat_completions(
         logger.error("Failed to write audit log", error=str(exc))
 
     return raw_response
+
+
+@router.get("/v1/telemetry/summary")
+async def telemetry_summary(
+    hours: int = 24,
+    auth_record: dict[str, Any] = Depends(require_auth),
+    log_repo: RequestLogRepository = Depends(get_request_log_repo),
+) -> dict[str, Any]:
+    """Authenticated summary endpoint for website/dashboard consumption."""
+    if hours < 1 or hours > 24 * 30:
+        raise HTTPException(status_code=400, detail="hours must be between 1 and 720")
+    summary = await log_repo.dashboard_summary(hours=hours)
+    return {
+        "status": "ok",
+        "entropy": summary,
+    }
+
+
+@router.get("/v1/telemetry/threats")
+async def telemetry_threats(
+    hours: int = 24,
+    limit: int = 8,
+    auth_record: dict[str, Any] = Depends(require_auth),
+    log_repo: RequestLogRepository = Depends(get_request_log_repo),
+) -> dict[str, Any]:
+    """Authenticated top-threat endpoint for website/dashboard consumption."""
+    if hours < 1 or hours > 24 * 30:
+        raise HTTPException(status_code=400, detail="hours must be between 1 and 720")
+    if limit < 1 or limit > 25:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 25")
+    items = await log_repo.top_threat_categories(hours=hours, limit=limit)
+    return {
+        "status": "ok",
+        "window_hours": hours,
+        "items": items,
+    }

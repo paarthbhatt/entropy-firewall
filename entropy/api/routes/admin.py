@@ -7,13 +7,22 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from entropy.api.dependencies import get_auth_service, require_auth
+from entropy.api.dependencies import get_auth_service, get_request_log_repo, require_auth
 from entropy.models.schemas import APIKeyCreateRequest, APIKeyCreateResponse
+from entropy.db.repository import RequestLogRepository
 from entropy.services.auth import AuthService
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _require_admin(auth_record: dict[str, Any]) -> None:
+    if auth_record.get("id") != "master" and auth_record.get("user_id") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only master/admin users can access this endpoint",
+        )
 
 
 @router.post(
@@ -27,12 +36,7 @@ async def create_api_key(
     auth_service: AuthService = Depends(get_auth_service),
 ) -> APIKeyCreateResponse:
     """Create a new API key (requires authentication)."""
-    # Only master key or admin users can create keys
-    if auth_record.get("id") != "master" and auth_record.get("user_id") != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only master/admin users can create API keys",
-        )
+    _require_admin(auth_record)
 
     key_id, raw_key = await auth_service.create_key(
         name=body.name,
@@ -58,11 +62,7 @@ async def revoke_api_key(
     auth_service: AuthService = Depends(get_auth_service),
 ) -> None:
     """Revoke an API key."""
-    if auth_record.get("id") != "master" and auth_record.get("user_id") != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only master/admin users can revoke API keys",
-        )
+    _require_admin(auth_record)
 
     ok = await auth_service.revoke_key(key_id)
     if not ok:
@@ -70,3 +70,33 @@ async def revoke_api_key(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="API key not found",
         )
+
+
+@router.get("/dashboard/summary")
+async def dashboard_summary(
+    hours: int = 24,
+    auth_record: dict[str, Any] = Depends(require_auth),
+    log_repo: RequestLogRepository = Depends(get_request_log_repo),
+) -> dict[str, Any]:
+    """Return aggregate security metrics for dashboard UI."""
+    _require_admin(auth_record)
+    if hours < 1 or hours > 24 * 30:
+        raise HTTPException(status_code=400, detail="hours must be between 1 and 720")
+    return await log_repo.dashboard_summary(hours=hours)
+
+
+@router.get("/dashboard/threats")
+async def dashboard_threats(
+    hours: int = 24,
+    limit: int = 8,
+    auth_record: dict[str, Any] = Depends(require_auth),
+    log_repo: RequestLogRepository = Depends(get_request_log_repo),
+) -> dict[str, Any]:
+    """Return top threat categories for dashboard charting."""
+    _require_admin(auth_record)
+    if hours < 1 or hours > 24 * 30:
+        raise HTTPException(status_code=400, detail="hours must be between 1 and 720")
+    if limit < 1 or limit > 25:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 25")
+    data = await log_repo.top_threat_categories(hours=hours, limit=limit)
+    return {"window_hours": hours, "items": data}
