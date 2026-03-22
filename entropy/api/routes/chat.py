@@ -204,7 +204,7 @@ async def chat_completions(
 
             # First chunk: send usage/metadata (optional in OAI spec but good for us)
             # Then yield chunks
-            for chunk in stream_iter:
+            async for chunk in stream_iter:
                 # Security scanning on chunks could happen here
                 # For output filtering on stream, we'd need a buffer
                 yield chunk

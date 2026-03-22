@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from entropy.api.dependencies import get_engine
 from entropy.config import get_settings
@@ -21,6 +21,7 @@ _start_time = time.time()
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check(
+    request: Request,
     engine: EntropyEngine = Depends(get_engine),
 ) -> HealthResponse:
     """Health check endpoint."""
@@ -28,12 +29,27 @@ async def health_check(
     patterns = engine.get_pattern_count()
     PATTERNS_LOADED.set(patterns)
 
+    redis_ok = False
+    db_ok = request.app.state.db_pool is not None
+
+    redis_client = getattr(request.app.state, "redis", None)
+    if redis_client is not None:
+        try:
+            await redis_client.ping()
+            redis_ok = True
+        except Exception:
+            redis_ok = False
+
+    overall_status = "healthy" if redis_ok and db_ok else "degraded"
+
     return HealthResponse(
-        status="healthy",
+        status=overall_status,
         version=settings.version,
         environment=settings.environment,
         patterns_loaded=patterns,
         uptime_seconds=round(time.time() - _start_time, 1),
+        redis_connected=redis_ok,
+        database_connected=db_ok,
     )
 
 

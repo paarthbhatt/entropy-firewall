@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 # Chat Completion — Request
 # ---------------------------------------------------------------------------
 
+
 class ChatMessage(BaseModel):
     """A single chat message."""
 
@@ -48,6 +49,7 @@ class ChatCompletionRequest(BaseModel):
 # Entropy verdict
 # ---------------------------------------------------------------------------
 
+
 class ThreatLevel(str, Enum):
     """Severity of a detected threat."""
 
@@ -75,8 +77,7 @@ class ThreatInfo(BaseModel):
     confidence: float = Field(ge=0, le=1)
     details: Optional[str] = None
     suggestion: Optional[str] = Field(
-        default=None,
-        description="Actionable suggestion to fix the issue"
+        default=None, description="Actionable suggestion to fix the issue"
     )
 
 
@@ -89,15 +90,14 @@ class EntropyVerdict(BaseModel):
     processing_time_ms: float = 0.0
     input_valid: bool = True
     output_sanitized: bool = False
-    
+
     # New fields for better analysis
     sanitized_content: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    
+
     # Actionable suggestion for the developer/user
     suggestion: Optional[str] = Field(
-        default=None,
-        description="Overall actionable suggestion to handle this verdict"
+        default=None, description="Overall actionable suggestion to handle this verdict"
     )
 
     def get_primary_threat(self) -> Optional[ThreatInfo]:
@@ -105,15 +105,13 @@ class EntropyVerdict(BaseModel):
         if not self.threats_detected:
             return None
         priority = {"critical": 4, "high": 3, "medium": 2, "low": 1, "safe": 0}
-        return max(
-            self.threats_detected,
-            key=lambda t: priority.get(t.threat_level.value, 0)
-        )
+        return max(self.threats_detected, key=lambda t: priority.get(t.threat_level.value, 0))
 
 
 # ---------------------------------------------------------------------------
 # Chat Completion — Response
 # ---------------------------------------------------------------------------
+
 
 class ChatCompletionChoice(BaseModel):
     """A single completion choice."""
@@ -144,23 +142,30 @@ class ChatCompletionResponse(BaseModel):
         description="Entropy security verdict for this request/response"
     )
 
+
 # ---------------------------------------------------------------------------
 # Streaming Models
 # ---------------------------------------------------------------------------
 
+
 class DeltaMessage(BaseModel):
     """A partial message delta."""
+
     role: Optional[Literal["system", "user", "assistant", "tool", "function"]] = None
     content: Optional[str] = None
 
+
 class StreamingChoice(BaseModel):
     """A single streaming choice."""
+
     index: int
     delta: DeltaMessage
     finish_reason: Optional[str] = None
 
+
 class ChatCompletionChunk(BaseModel):
     """OpenAI-compatible chat completion chunk."""
+
     id: str
     object: str = "chat.completion.chunk"
     created: int
@@ -173,6 +178,7 @@ class ChatCompletionChunk(BaseModel):
 # Error response
 # ---------------------------------------------------------------------------
 
+
 class ErrorResponse(BaseModel):
     """Standardized error response."""
 
@@ -180,14 +186,14 @@ class ErrorResponse(BaseModel):
     detail: Optional[str] = None
     entropy: Optional[EntropyVerdict] = None
     action_suggestion: Optional[str] = Field(
-        default=None,
-        description="Actionable suggestion to fix the error"
+        default=None, description="Actionable suggestion to fix the error"
     )
 
 
 # ---------------------------------------------------------------------------
 # Health / Admin / Rules
 # ---------------------------------------------------------------------------
+
 
 class HealthResponse(BaseModel):
     """Health check response."""
@@ -197,6 +203,8 @@ class HealthResponse(BaseModel):
     environment: str
     patterns_loaded: int = 0
     uptime_seconds: float = 0.0
+    redis_connected: bool = True
+    database_connected: bool = True
 
 
 class APIKeyCreateRequest(BaseModel):
@@ -216,9 +224,11 @@ class APIKeyCreateResponse(BaseModel):
     name: str
     created_at: str
 
+
 # New Rule Management Schemas
 class FirewallRule(BaseModel):
     """A dynamic firewall rule."""
+
     id: str
     name: str
     category: str
@@ -227,22 +237,28 @@ class FirewallRule(BaseModel):
     enabled: bool = True
     created_at: str
 
+
 class FirewallRuleCreate(BaseModel):
     """Schema for creating a new firewall rule."""
+
     name: str = Field(..., min_length=1)
     category: str = Field(..., min_length=1)
     pattern: str = Field(..., min_length=1, description="Regex pattern")
     threat_level: ThreatLevel = ThreatLevel.MEDIUM
     enabled: bool = True
 
+
 class ModelInfo(BaseModel):
     """Information about an available model."""
+
     id: str
     object: str = "model"
     created: int = 0
     owned_by: str = "entropy"
 
+
 class ModelListResponse(BaseModel):
     """List of available models."""
+
     object: str = "list"
     data: list[ModelInfo]

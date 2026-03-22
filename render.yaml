@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: entropy-firewall
+    env: python
+    plan: starter
+    autoDeploy: true
+    buildCommand: pip install -e .
+    startCommand: python -m uvicorn entropy.api.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ENTROPY_ENVIRONMENT
+        value: production
+      - key: ENTROPY_DEBUG
+        value: "false"
+      - key: ENTROPY_ENFORCE_DEPENDENCIES
+        value: "true"
+      - key: ENTROPY_CORS_ORIGINS
+        sync: false
+      - key: ENTROPY_LOG_LEVEL
+        value: INFO
+      - key: ENTROPY_DB_HOST
+        value: db.ueensymzibkphikmkbnr.supabase.co
+      - key: ENTROPY_DB_PORT
+        value: "5432"
+      - key: ENTROPY_DB_NAME
+        value: postgres
+      - key: ENTROPY_DB_USER
+        value: postgres
+      - key: ENTROPY_DB_PASSWORD
+        sync: false
+      - key: ENTROPY_REDIS_URL
+        sync: false
+      - key: ENTROPY_MASTER_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai

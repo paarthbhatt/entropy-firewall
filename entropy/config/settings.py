@@ -23,6 +23,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Sub-configs
 # ---------------------------------------------------------------------------
 
+
 class InputValidationSettings(BaseSettings):
     """Input validation thresholds."""
 
@@ -30,9 +31,7 @@ class InputValidationSettings(BaseSettings):
 
     max_tokens: int = Field(default=4096, description="Maximum tokens per request")
     max_chars: int = Field(default=32000, description="Maximum characters per request")
-    allowed_encodings: List[str] = Field(
-        default=["utf-8"], description="Allowed text encodings"
-    )
+    allowed_encodings: List[str] = Field(default=["utf-8"], description="Allowed text encodings")
     max_special_chars_ratio: float = Field(
         default=0.3, description="Max ratio of special characters to total"
     )
@@ -55,7 +54,7 @@ class EngineSettings(BaseSettings):
     """Entropy engine detection settings."""
 
     model_config = SettingsConfigDict(env_prefix="ENTROPY_")
-    
+
     # Engine toggles
     enable_semantic_analysis: bool = Field(
         default=False, description="Enable Pro LLM-based semantic analysis"
@@ -63,7 +62,7 @@ class EngineSettings(BaseSettings):
     enable_context_analysis: bool = Field(
         default=True, description="Enable multi-turn context analysis"
     )
-    
+
     # Thresholds
     pattern_threshold: float = Field(
         default=0.7, description="Minimum confidence to flag a pattern match"
@@ -79,9 +78,7 @@ class EngineSettings(BaseSettings):
     enable_recursive_decoding: bool = Field(
         default=True, description="Enable multi-layer encoding detection and decoding"
     )
-    max_decode_depth: int = Field(
-        default=5, description="Max recursive decoding iterations"
-    )
+    max_decode_depth: int = Field(default=5, description="Max recursive decoding iterations")
 
     # Indirect prompt injection detection
     enable_indirect_injection_detection: bool = Field(
@@ -94,14 +91,12 @@ class EngineSettings(BaseSettings):
     # Semantic analysis (local intelligence layer)
     semantic_model_path: str = Field(
         default="~/.entropy/models/entropy-classifier.onnx",
-        description="Path to ONNX semantic classifier model"
+        description="Path to ONNX semantic classifier model",
     )
     semantic_confidence_threshold: float = Field(
         default=0.75, description="Minimum confidence for semantic threat classification"
     )
-    semantic_model_url: str = Field(
-        default="", description="URL to download the ONNX model from"
-    )
+    semantic_model_url: str = Field(default="", description="URL to download the ONNX model from")
 
     @field_validator("pattern_threshold")
     @classmethod
@@ -118,9 +113,7 @@ class OutputFilterSettings(BaseSettings):
 
     pii_detection: bool = Field(default=True, description="Enable PII detection")
     code_scanning: bool = Field(default=True, description="Enable code injection scanning")
-    system_prompt_protection: bool = Field(
-        default=True, description="Detect system prompt leakage"
-    )
+    system_prompt_protection: bool = Field(default=True, description="Detect system prompt leakage")
     redact_mode: bool = Field(
         default=True, description="Redact sensitive data (True) or block entirely (False)"
     )
@@ -142,10 +135,7 @@ class DatabaseSettings(BaseSettings):
     @property
     def dsn(self) -> str:
         """Build PostgreSQL DSN string."""
-        return (
-            f"postgresql://{self.user}:{self.password}"
-            f"@{self.host}:{self.port}/{self.name}"
-        )
+        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
 
 
 class RedisSettings(BaseSettings):
@@ -172,6 +162,7 @@ class LoggingSettings(BaseSettings):
 # Main Settings
 # ---------------------------------------------------------------------------
 
+
 class Settings(BaseSettings):
     """Root application settings."""
 
@@ -187,6 +178,10 @@ class Settings(BaseSettings):
     version: str = Field(default="0.1.0")
     environment: str = Field(default="development")
     debug: bool = Field(default=False)
+    enforce_dependencies: bool = Field(
+        default=False,
+        description="Fail startup when Redis/DB is unavailable",
+    )
 
     # Server
     host: str = Field(default="0.0.0.0")
@@ -203,12 +198,14 @@ class Settings(BaseSettings):
 
     # LLM Provider
     openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
-    openai_base_url: Optional[str] = Field(default=None, alias="OPENAI_BASE_URL", description="Optional custom base URL for Azure/LocalAI")
+    openai_base_url: Optional[str] = Field(
+        default=None,
+        alias="OPENAI_BASE_URL",
+        description="Optional custom base URL for Azure/LocalAI",
+    )
 
     # Sub-configs
-    input_validation: InputValidationSettings = Field(
-        default_factory=InputValidationSettings
-    )
+    input_validation: InputValidationSettings = Field(default_factory=InputValidationSettings)
     rate_limit: RateLimitSettings = Field(default_factory=RateLimitSettings)
     engine: EngineSettings = Field(default_factory=EngineSettings)
     output_filter: OutputFilterSettings = Field(default_factory=OutputFilterSettings)
@@ -229,6 +226,7 @@ class Settings(BaseSettings):
 # YAML config support
 # ---------------------------------------------------------------------------
 
+
 def _load_yaml_config() -> dict[str, Any]:
     """Attempt to load entropy_config.yaml from common locations."""
     search_paths = [
@@ -245,7 +243,7 @@ def _load_yaml_config() -> dict[str, Any]:
                     data = yaml.safe_load(f)
                 return data if isinstance(data, dict) else {}
             except Exception:
-                pass # Silently ignore config load failures to fallback to defaults
+                pass  # Silently ignore config load failures to fallback to defaults
     return {}
 
 

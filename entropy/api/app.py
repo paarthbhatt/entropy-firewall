@@ -52,6 +52,8 @@ async def lifespan(app: FastAPI):
         logger.info("Redis connected", url=settings.redis.url)
     except Exception as exc:
         logger.error("Redis connection failed — rate limiting disabled", error=str(exc))
+        if settings.environment == "production" and settings.enforce_dependencies:
+            raise RuntimeError("Redis connection failed in production") from exc
         # Create a dummy Redis that won't break the app
         app.state.redis = aioredis.from_url("redis://localhost:6379/0", decode_responses=True)
 
@@ -62,6 +64,8 @@ async def lifespan(app: FastAPI):
         logger.info("Database connected and migrated")
     except Exception as exc:
         logger.error("Database connection failed — audit logging disabled", error=str(exc))
+        if settings.environment == "production" and settings.enforce_dependencies:
+            raise RuntimeError("Database connection failed in production") from exc
         app.state.db_pool = None
 
     # Configure structlog
