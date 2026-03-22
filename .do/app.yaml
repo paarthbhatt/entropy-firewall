@@ -1,0 +1,58 @@
+name: entropy-firewall
+
+services:
+  - name: api
+    github:
+      repo: paarthbhatt/entropy-firewall
+      branch: main
+      deploy_on_push: true
+    source_dir: /
+    run_command: python -m uvicorn entropy.api.app:app --host 0.0.0.0 --port ${PORT}
+    environment_slug: python
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    http_port: 8000
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 20
+      period_seconds: 15
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+    envs:
+      - key: ENTROPY_ENVIRONMENT
+        scope: RUN_AND_BUILD_TIME
+        value: production
+      - key: ENTROPY_DEBUG
+        scope: RUN_AND_BUILD_TIME
+        value: "false"
+      - key: ENTROPY_MASTER_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: __SET_ME__
+      - key: ENTROPY_REDIS_URL
+        scope: RUN_TIME
+        value: redis://localhost:6379/0
+      - key: ENTROPY_DB_HOST
+        scope: RUN_TIME
+        value: db.ueensymzibkphikmkbnr.supabase.co
+      - key: ENTROPY_DB_PORT
+        scope: RUN_TIME
+        value: "5432"
+      - key: ENTROPY_DB_NAME
+        scope: RUN_TIME
+        value: postgres
+      - key: ENTROPY_DB_USER
+        scope: RUN_TIME
+        value: postgres
+      - key: ENTROPY_DB_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+        value: __SET_ME__
+      - key: OPENAI_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: __SET_ME__
+      - key: OPENAI_BASE_URL
+        scope: RUN_TIME
+        value: https://generativelanguage.googleapis.com/v1beta/openai
