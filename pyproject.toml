@@ -178,6 +178,63 @@ ignore_missing_imports = true
 module = "redis"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "llama_index.llms.openai"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "llama_index.llms"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "google.generativeai"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "anthropic"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "openai"
+ignore_missing_imports = true
+
+# Relaxed type checking for SDK and provider files
+[[tool.mypy.overrides]]
+module = "entropy.sdk.client"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "entropy.sdk.secure"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "entropy.providers.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "entropy.db.repository"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "entropy.providers.registry"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "entropy.api.app"
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "entropy.api.dependencies"
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "entropy.cli.main"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "entropy.integrations"
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

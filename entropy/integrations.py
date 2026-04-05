@@ -19,10 +19,7 @@ Usage:
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from types import ModuleType
+from typing import Any
 
 FRAMEWORKS: dict[str, type[FrameworkIntegration]] = {}
 
@@ -66,7 +63,9 @@ class LangChainIntegration(FrameworkIntegration):
         entropy_api_key = kwargs.get("entropy_api_key")
 
         try:
-            from langchain_openai import ChatOpenAI  # type: ignore[import-not-found]
+            from langchain_openai import (  # noqa: PLC0415
+                ChatOpenAI,  # type: ignore[import-not-found]
+            )
 
             original_class: type = ChatOpenAI
 
@@ -79,7 +78,7 @@ class LangChainIntegration(FrameworkIntegration):
                         init_kwargs["api_key"] = entropy_api_key
                     super().__init__(**init_kwargs)
 
-            import langchain_openai as langchain_openai_module
+            import langchain_openai as langchain_openai_module  # noqa: PLC0415
 
             langchain_openai_module.ChatOpenAI = SecuredChatOpenAI
 
@@ -103,7 +102,9 @@ class LlamaIndexIntegration(FrameworkIntegration):
         entropy_api_key = kwargs.get("entropy_api_key")
 
         try:
-            from llama_index.llms.openai import OpenAI  # type: ignore[import-not-found]
+            from llama_index.llms.openai import (  # noqa: PLC0415
+                OpenAI,  # type: ignore[import-not-found]
+            )
 
             original_class: type = OpenAI
 
@@ -116,7 +117,7 @@ class LlamaIndexIntegration(FrameworkIntegration):
                         init_kwargs["api_key"] = entropy_api_key
                     super().__init__(**init_kwargs)
 
-            import llama_index.llms.openai as llama_index_llms
+            import llama_index.llms.openai as llama_index_llms  # noqa: PLC0415
 
             llama_index_llms.OpenAI = SecuredOpenAI
 
@@ -140,7 +141,7 @@ class AutoGenIntegration(FrameworkIntegration):
         entropy_api_key = kwargs.get("entropy_api_key")
 
         try:
-            from autogen import OpenAI  # type: ignore[import-not-found]
+            from autogen import OpenAI  # type: ignore[import-not-found]  # noqa: PLC0415
 
             original_class: type = OpenAI
 
@@ -153,7 +154,7 @@ class AutoGenIntegration(FrameworkIntegration):
                         init_kwargs["api_key"] = entropy_api_key
                     super().__init__(**init_kwargs)
 
-            import autogen as autogen_module
+            import autogen as autogen_module  # noqa: PLC0415
 
             autogen_module.OpenAI = SecuredOpenAI
 

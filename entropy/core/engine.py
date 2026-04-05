@@ -37,7 +37,6 @@ logger = structlog.get_logger(__name__)
 # Optional Pro-tier imports
 # ---------------------------------------------------------------------------
 
-from typing import Any
 
 _HAS_CONTEXT = False
 _HAS_SEMANTIC = False

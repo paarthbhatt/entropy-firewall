@@ -15,36 +15,36 @@ InputSanitizer: Any = None
 SemanticAnalyzer: Any = None
 
 try:
-    from entropy_pro.core.context_analyzer import ContextAnalyzer as _CA
+    from entropy_pro.core.context_analyzer import ContextAnalyzer as ContextAnalyzerPro
 
-    if _CA is not None:
-        ContextAnalyzer = _CA
+    if ContextAnalyzerPro is not None:
+        ContextAnalyzer = ContextAnalyzerPro
 except ImportError:
     pass
 
 try:
     from entropy_pro.core.indirect_injection_detector import (
-        IndirectInjectionDetector as _IID,
+        IndirectInjectionDetector as IndirectInjectionDetectorPro,
     )
 
-    if _IID is not None:
-        IndirectInjectionDetector = _IID
+    if IndirectInjectionDetectorPro is not None:
+        IndirectInjectionDetector = IndirectInjectionDetectorPro
 except ImportError:
     pass
 
 try:
-    from entropy_pro.core.input_sanitizer import InputSanitizer as _IS
+    from entropy_pro.core.input_sanitizer import InputSanitizer as InputSanitizerPro
 
-    if _IS is not None:
-        InputSanitizer = _IS
+    if InputSanitizerPro is not None:
+        InputSanitizer = InputSanitizerPro
 except ImportError:
     pass
 
 try:
-    from entropy_pro.core.semantic_analyzer import SemanticAnalyzer as _SA
+    from entropy_pro.core.semantic_analyzer import SemanticAnalyzer as SemanticAnalyzerPro
 
-    if _SA is not None:
-        SemanticAnalyzer = _SA
+    if SemanticAnalyzerPro is not None:
+        SemanticAnalyzer = SemanticAnalyzerPro
 except ImportError:
     pass
 

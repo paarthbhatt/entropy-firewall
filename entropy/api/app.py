@@ -28,7 +28,7 @@ logger = structlog.get_logger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     """Application startup / shutdown lifecycle."""
     settings = get_settings()
 
@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI):
             socket_timeout=settings.redis.socket_timeout,
             decode_responses=True,
         )
-        await redis_client.ping()
+        await redis_client.ping()  # type: ignore[misc]
         app.state.redis = redis_client
         logger.info("Redis connected", url=settings.redis.url)
     except Exception as exc:

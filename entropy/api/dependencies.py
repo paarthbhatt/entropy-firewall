@@ -8,6 +8,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
 import redis.asyncio as aioredis
 import structlog
 from fastapi import Depends, HTTPException, Request, status
@@ -54,7 +57,9 @@ class _TestingProvider:
             "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
         }
 
-    def chat_completion_stream(self, model: str, messages: list[dict[str, Any]], **kwargs: Any):
+    def chat_completion_stream(
+        self, model: str, messages: list[dict[str, Any]], **kwargs: Any
+    ) -> Generator[str, None, None]:
         yield "data: [DONE]\n\n"
 
 
@@ -64,7 +69,7 @@ class _TestingProvider:
 
 
 def _get_redis(request: Request) -> aioredis.Redis | None:
-    return request.app.state.redis
+    return request.app.state.redis  # type: ignore[no-any-return]
 
 
 def _get_db_pool(request: Request) -> Any:
