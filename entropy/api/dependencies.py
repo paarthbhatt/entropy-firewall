@@ -63,7 +63,7 @@ class _TestingProvider:
 # ---------------------------------------------------------------------------
 
 
-def _get_redis(request: Request) -> aioredis.Redis:
+def _get_redis(request: Request) -> aioredis.Redis | None:
     return request.app.state.redis
 
 

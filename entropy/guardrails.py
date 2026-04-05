@@ -28,7 +28,7 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
@@ -181,8 +181,8 @@ def load_guardrails(
     search_dirs = search_dirs or [
         ".",
         os.getcwd(),
-        Path.cwd().parent,
-        Path.home() / ".entropy",
+        str(Path.cwd().parent),
+        str(Path.home() / ".entropy"),
     ]
 
     # Also check ENV var

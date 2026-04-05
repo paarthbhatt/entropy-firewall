@@ -26,12 +26,12 @@ def generate_api_key() -> str:
 
 def hash_api_key(raw_key: str) -> str:
     """Hash an API key for storage."""
-    return bcrypt.using(rounds=12).hash(raw_key)
+    return str(bcrypt.using(rounds=12).hash(raw_key))
 
 
 def verify_api_key(raw_key: str, hashed: str) -> bool:
     """Verify a raw key against a stored hash."""
-    return bcrypt.verify(raw_key, hashed)
+    return bool(bcrypt.verify(raw_key, hashed))
 
 
 def key_prefix(raw_key: str) -> str:

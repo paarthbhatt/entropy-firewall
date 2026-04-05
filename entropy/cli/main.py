@@ -40,7 +40,7 @@ def scan(
             context_analyzer,
         )
     except ImportError:
-        context_analyzer = None  # type: ignore[assignment]
+        context_analyzer = None
 
     rprint("[bold cyan]🔍 Scanning text...[/bold cyan]")
 
@@ -100,11 +100,11 @@ def scan(
         out_table.add_column("Category", style="magenta")
         out_table.add_column("Count", style="white")
 
-        for d in detections_out:
+        for d in detections_out:  # type: ignore[assignment, attr-defined]
             out_table.add_row(
-                d["rule"],
-                d["category"],
-                str(d["count"]),
+                d.get("rule", "unknown"),
+                d.get("category", "unknown"),
+                str(d.get("count", 0)),
             )
         console.print(out_table)
 

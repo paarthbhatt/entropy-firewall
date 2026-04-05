@@ -19,9 +19,11 @@ Usage:
 from __future__ import annotations
 
 import importlib
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-# Framework registry
+if TYPE_CHECKING:
+    from types import ModuleType
+
 FRAMEWORKS: dict[str, type[FrameworkIntegration]] = {}
 
 
@@ -41,7 +43,7 @@ class FrameworkIntegration:
     @classmethod
     def is_installed(cls) -> bool:
         """Check if the framework is installed."""
-        return importlib.util.find_spec(cls.package_name) is not None
+        return importlib.util.find_spec(cls.package_name) is not None  # type: ignore[attr-defined]
 
     @classmethod
     def patch(cls, **kwargs: Any) -> bool:
@@ -64,33 +66,22 @@ class LangChainIntegration(FrameworkIntegration):
         entropy_api_key = kwargs.get("entropy_api_key")
 
         try:
-            from langchain_openai import ChatOpenAI  # noqa: PLC0415
+            from langchain_openai import ChatOpenAI  # type: ignore[import-not-found]
 
-            # Store original class
-            original_class = ChatOpenAI
+            original_class: type = ChatOpenAI
 
             class SecuredChatOpenAI(original_class):
                 """ChatOpenAI wrapper that routes through Entropy."""
 
                 def __init__(self, **init_kwargs: Any):
-                    # Override the base_url to point to Entropy
                     init_kwargs["base_url"] = entropy_url
                     if entropy_api_key:
                         init_kwargs["api_key"] = entropy_api_key
                     super().__init__(**init_kwargs)
 
-            # Replace in module
-            import langchain_openai  # noqa: PLC0415
+            import langchain_openai as langchain_openai_module
 
-            langchain_openai.ChatOpenAI = SecuredChatOpenAI
-
-            # Also patch for langchain.chat_models (legacy)
-            try:
-                import langchain.chat_models  # noqa: PLC0415
-
-                langchain.chat_models.ChatOpenAI = SecuredChatOpenAI
-            except ImportError:
-                pass
+            langchain_openai_module.ChatOpenAI = SecuredChatOpenAI
 
             return True
         except ImportError:
@@ -112,9 +103,9 @@ class LlamaIndexIntegration(FrameworkIntegration):
         entropy_api_key = kwargs.get("entropy_api_key")
 
         try:
-            from llama_index.llms.openai import OpenAI  # noqa: PLC0415
+            from llama_index.llms.openai import OpenAI  # type: ignore[import-not-found]
 
-            original_class = OpenAI
+            original_class: type = OpenAI
 
             class SecuredOpenAI(original_class):
                 """OpenAI wrapper that routes through Entropy."""
@@ -125,9 +116,9 @@ class LlamaIndexIntegration(FrameworkIntegration):
                         init_kwargs["api_key"] = entropy_api_key
                     super().__init__(**init_kwargs)
 
-            import llama_index.llms.openai  # noqa: PLC0415
+            import llama_index.llms.openai as llama_index_llms
 
-            llama_index.llms.openai.OpenAI = SecuredOpenAI
+            llama_index_llms.OpenAI = SecuredOpenAI
 
             return True
         except ImportError:
@@ -149,9 +140,9 @@ class AutoGenIntegration(FrameworkIntegration):
         entropy_api_key = kwargs.get("entropy_api_key")
 
         try:
-            from autogen import OpenAI  # noqa: PLC0415
+            from autogen import OpenAI  # type: ignore[import-not-found]
 
-            original_class = OpenAI
+            original_class: type = OpenAI
 
             class SecuredOpenAI(original_class):
                 """OpenAI wrapper that routes through Entropy."""
@@ -162,9 +153,9 @@ class AutoGenIntegration(FrameworkIntegration):
                         init_kwargs["api_key"] = entropy_api_key
                     super().__init__(**init_kwargs)
 
-            import autogen  # noqa: PLC0415
+            import autogen as autogen_module
 
-            autogen.OpenAI = SecuredOpenAI
+            autogen_module.OpenAI = SecuredOpenAI
 
             return True
         except ImportError:

@@ -99,8 +99,84 @@ warn_no_return = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-module = ["tests.*"]
+module = "tests.*"
 disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "yaml"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "passlib.hash"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "asyncpg"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "google"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "anthropic"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "langchain"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "langchain_openai"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "llama_index"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "llama_index.llms"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "autogen"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "entropy_pro"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "entropy_pro.core"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "entropy_pro.core.context_analyzer"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "entropy_pro.core.semantic_analyzer"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "entropy_pro.core.input_sanitizer"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "entropy_pro.core.indirect_injection_detector"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "httpx"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "openai"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "redis"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

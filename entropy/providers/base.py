@@ -40,7 +40,7 @@ class BaseProvider(ABC):
         ...
 
     @abstractmethod
-    async def chat_completion_stream(
+    def chat_completion_stream(
         self,
         *,
         model: str,

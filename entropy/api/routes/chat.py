@@ -27,6 +27,7 @@ from entropy.db.repository import RequestLogRepository  # noqa: TC001
 from entropy.models.schemas import (
     ChatCompletionRequest,
     ChatCompletionResponse,
+    ChatMessage,
     EntropyStatus,
     EntropyVerdict,
     ErrorResponse,
@@ -85,8 +86,9 @@ async def analyze_content(
     if not text:
         raise HTTPException(status_code=400, detail="Text field is required")
 
-    fake_request = ChatCompletionRequest(
-        model="analyze-only", messages=[{"role": "user", "content": text}]
+    fake_request = ChatCompletionRequest(  # type: ignore[call-arg]
+        model="analyze-only",
+        messages=[ChatMessage(role="user", content=text)],
     )
     history = body.get("history", [])
 

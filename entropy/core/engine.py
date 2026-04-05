@@ -37,45 +37,60 @@ logger = structlog.get_logger(__name__)
 # Optional Pro-tier imports
 # ---------------------------------------------------------------------------
 
+from typing import Any
+
+_HAS_CONTEXT = False
+_HAS_SEMANTIC = False
+_HAS_SANITIZER = False
+_HAS_INDIRECT = False
+_ContextAnalyzer: Any = None
+_SemanticAnalyzer: Any = None
+_InputSanitizer: Any = None
+_IndirectDetector: Any = None
+
 try:
     from entropy_pro.core.context_analyzer import (
-        ContextAnalyzer as _ContextAnalyzer,  # type: ignore[import]
+        ContextAnalyzer as _CtxAna,
     )
 
-    _HAS_CONTEXT = True
+    if _CtxAna is not None:
+        _ContextAnalyzer = _CtxAna
+        _HAS_CONTEXT = True
 except ImportError:
-    _ContextAnalyzer = None  # type: ignore[assignment,misc]
-    _HAS_CONTEXT = False
+    pass
 
 try:
     from entropy_pro.core.semantic_analyzer import (
-        SemanticAnalyzer as _SemanticAnalyzer,  # type: ignore[import]
+        SemanticAnalyzer as _SemAna,
     )
 
-    _HAS_SEMANTIC = True
+    if _SemAna is not None:
+        _SemanticAnalyzer = _SemAna
+        _HAS_SEMANTIC = True
 except ImportError:
-    _SemanticAnalyzer = None  # type: ignore[assignment,misc]
-    _HAS_SEMANTIC = False
+    pass
 
 try:
     from entropy_pro.core.input_sanitizer import (
-        InputSanitizer as _InputSanitizer,  # type: ignore[import]
+        InputSanitizer as _InpSan,
     )
 
-    _HAS_SANITIZER = True
+    if _InpSan is not None:
+        _InputSanitizer = _InpSan
+        _HAS_SANITIZER = True
 except ImportError:
-    _InputSanitizer = None  # type: ignore[assignment,misc]
-    _HAS_SANITIZER = False
+    pass
 
 try:
     from entropy_pro.core.indirect_injection_detector import (
-        IndirectInjectionDetector as _IndirectDetector,  # type: ignore[import]
+        IndirectInjectionDetector as _IndDet,
     )
 
-    _HAS_INDIRECT = True
+    if _IndDet is not None:
+        _IndirectDetector = _IndDet
+        _HAS_INDIRECT = True
 except ImportError:
-    _IndirectDetector = None  # type: ignore[assignment,misc]
-    _HAS_INDIRECT = False
+    pass
 
 # ---------------------------------------------------------------------------
 # Threat-level helpers

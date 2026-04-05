@@ -62,7 +62,7 @@ class CompletionsNamespace:
     def __init__(self, client: EntropyClient):
         self._client = client
 
-    def create(self, **kwargs) -> dict[str, Any]:
+    def create(self, **kwargs: Any) -> dict[str, Any]:
         return self._client._post_chat_completions(**kwargs)
 
 
@@ -70,7 +70,7 @@ class AsyncCompletionsNamespace:
     def __init__(self, client: AsyncEntropyClient):
         self._client = client
 
-    async def create(self, **kwargs) -> dict[str, Any]:
+    async def create(self, **kwargs: Any) -> dict[str, Any]:
         return await self._client._post_chat_completions(**kwargs)
 
 
@@ -119,17 +119,15 @@ class EntropyClient:
         """Check server health."""
         return self._request("GET", "/health")
 
-    def _post_chat_completions(self, **kwargs) -> dict[str, Any]:
+    def _post_chat_completions(self, **kwargs: Any) -> dict[str, Any] | Generator[str, None, None]:  # type: ignore[return]
         """Internal handler for chat completions."""
-        # Check for stream
         stream = kwargs.get("stream", False)
         if stream:
-            # For streaming, we return a generator
-            return self._stream_request("POST", "/v1/chat/completions", json=kwargs)
+            return self._stream_request("POST", "/v1/chat/completions", json=kwargs)  # type: ignore[return]
 
         return self._request("POST", "/v1/chat/completions", json=kwargs)
 
-    def _request(self, method: str, path: str, **kwargs) -> Any:
+    def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         try:
             resp = self._http.request(method, path, **kwargs)
             if resp.status_code == 403:
@@ -209,13 +207,15 @@ class AsyncEntropyClient:
         """Check server health."""
         return await self._request("GET", "/health")
 
-    async def _post_chat_completions(self, **kwargs) -> Any:
+    async def _post_chat_completions(
+        self, **kwargs: Any
+    ) -> dict[str, Any] | Generator[str, None, None]:
         stream = kwargs.get("stream", False)
         if stream:
             return self._stream_request("POST", "/v1/chat/completions", json=kwargs)
         return await self._request("POST", "/v1/chat/completions", json=kwargs)
 
-    async def _request(self, method: str, path: str, **kwargs) -> Any:
+    async def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         try:
             resp = await self._http.request(method, path, **kwargs)
             if resp.status_code == 403:
