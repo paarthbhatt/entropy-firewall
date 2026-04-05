@@ -10,18 +10,13 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
-import json
-import sys
-import uuid
 import secrets
-from pathlib import Path
 
 import typer
 from rich import print as rprint
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
 app = typer.Typer(
     name="entropy",
@@ -37,16 +32,17 @@ def scan(
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Scan text for prompt injection and other attacks."""
-    # Lazy imports to speed up CLI
-    from entropy.core.pattern_matcher import PatternMatcher
-    from entropy.core.output_filter import OutputFilter
+    from entropy.core.output_filter import OutputFilter  # noqa: PLC0415
+    from entropy.core.pattern_matcher import PatternMatcher  # noqa: PLC0415
 
     try:
-        from entropy_pro.core.context_analyzer import ContextAnalyzer  # type: ignore[import]
+        from entropy_pro.core.context_analyzer import (  # noqa: PLC0415
+            context_analyzer,
+        )
     except ImportError:
-        ContextAnalyzer = None  # type: ignore[assignment]
+        context_analyzer = None  # type: ignore[assignment]
 
-    rprint(f"\n[bold cyan]🔍 Scanning text...[/bold cyan]")
+    rprint("[bold cyan]🔍 Scanning text...[/bold cyan]")
 
     # 1. Pattern Matching
     matcher = PatternMatcher()
@@ -55,12 +51,12 @@ def scan(
     # 2. Context Analysis (Single turn context) - Pro only
     ctx_conf = 0.0
     ctx_issues: list[str] = []
-    if ContextAnalyzer is not None:
-        context_analyzer = ContextAnalyzer()
-        ctx_conf, ctx_issues = context_analyzer.analyze(text, [{"role": "user", "content": text}])
+    if context_analyzer is not None:
+        analyzer = context_analyzer()
+        ctx_conf, ctx_issues = analyzer.analyze(text, [{"role": "user", "content": text}])
 
     if is_malicious or ctx_issues:
-        rprint(f"\n[bold red]⚠  THREAT DETECTED[/bold red]")
+        rprint("\n[bold red]⚠  THREAT DETECTED[/bold red]")
         rprint(f"   Confidence: [yellow]{max(confidence, ctx_conf):.1%}[/yellow]")
         rprint(f"   Max Level:  [red]{max_level.value.upper()}[/red]")
         rprint(f"   Threats:    {len(detections) + len(ctx_issues)}\n")
@@ -98,7 +94,7 @@ def scan(
     output_filter = OutputFilter()
     detections_out = output_filter.analyze(text)
     if detections_out:
-        rprint(f"\n[yellow]⚠  Sensitive data detected:[/yellow]")
+        rprint("\n[yellow]⚠  Sensitive data detected:[/yellow]")
         out_table = Table(title="Output Redaction", show_header=True)
         out_table.add_column("Rule", style="cyan")
         out_table.add_column("Category", style="magenta")
@@ -116,7 +112,7 @@ def scan(
 @app.command()
 def patterns() -> None:
     """List all loaded detection patterns."""
-    from entropy.core.pattern_matcher import PatternMatcher
+    from entropy.core.pattern_matcher import PatternMatcher  # noqa: PLC0415
 
     matcher = PatternMatcher()
     rprint(f"\n[bold cyan]Loaded {matcher.get_pattern_count()} patterns[/bold cyan]")
@@ -144,7 +140,7 @@ def server(
 ) -> None:
     """Start the Entropy API server."""
     # We use a subprocess to run uvicorn to ensure clean environment
-    import uvicorn
+    import uvicorn  # noqa: PLC0415
 
     rprint(
         Panel(
@@ -168,19 +164,19 @@ def health(
     url: str = typer.Option("http://localhost:8000", help="Entropy server URL"),
 ) -> None:
     """Check health of a running Entropy server."""
-    import httpx
+    import httpx  # noqa: PLC0415
 
     try:
         resp = httpx.get(f"{url}/health", timeout=5)
         data = resp.json()
-        rprint(f"\n[bold green]✓  Server healthy[/bold green]")
+        rprint("\n[bold green]✓  Server healthy[/bold green]")
         rprint(f"   Version:     {data.get('version')}")
         rprint(f"   Environment: {data.get('environment')}")
         rprint(f"   Patterns:    {data.get('patterns_loaded')}")
         rprint(f"   Uptime:      {data.get('uptime_seconds', 0):.0f}s\n")
     except Exception as exc:
         rprint(f"\n[bold red]✗  Server unreachable:[/bold red] {exc}\n")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -195,7 +191,7 @@ def generate_key(
     key_part = secrets.token_urlsafe(32)
     full_key = f"{prefix}-{key_part}"
 
-    rprint(f"\n[bold green]✓  Generated API Key:[/bold green]")
+    rprint("\n[bold green]✓  Generated API Key:[/bold green]")
     rprint(Panel(f"[bold yellow]{full_key}[/bold yellow]", title=name))
     rprint("[dim]Use this key in the X-API-Key header[/dim]\n")
 
@@ -205,7 +201,7 @@ def init(
     path: str = typer.Option("entropy.yaml", help="Path for config file"),
 ) -> None:
     """Create a sample guardrails configuration file."""
-    from entropy.guardrails import create_sample_config
+    from entropy.guardrails import create_sample_config  # noqa: PLC0415
 
     create_sample_config(path)
     rprint(f"\n[bold green]✓  Created guardrails config:[/bold green] {path}")
@@ -215,7 +211,7 @@ def init(
 @app.command()
 def detect() -> None:
     """Detect installed LLM frameworks."""
-    from entropy.integrations import detect_frameworks
+    from entropy.integrations import detect_frameworks  # noqa: PLC0415
 
     frameworks = detect_frameworks()
 
@@ -238,7 +234,7 @@ def add(
     entropy_key: str = typer.Option(None, help="Entropy API key (optional)"),
 ) -> None:
     """Add Entropy protection to an installed framework."""
-    from entropy.integrations import patch_framework, detect_frameworks
+    from entropy.integrations import detect_frameworks, patch_framework  # noqa: PLC0415
 
     frameworks = detect_frameworks()
 

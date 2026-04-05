@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import asyncpg
 import structlog
 
@@ -12,12 +10,12 @@ from entropy.config import get_settings
 logger = structlog.get_logger(__name__)
 
 # Module-level connection pool
-_pool: Optional[asyncpg.Pool] = None
+_pool: asyncpg.Pool | None = None
 
 
 async def get_pool() -> asyncpg.Pool:
     """Get or create the asyncpg connection pool."""
-    global _pool
+    global _pool  # noqa: PLW0603
     if _pool is None:
         _pool = await create_pool()
     return _pool
@@ -46,7 +44,7 @@ async def create_pool() -> asyncpg.Pool:
 
 async def close_pool() -> None:
     """Close the connection pool."""
-    global _pool
+    global _pool  # noqa: PLW0603
     if _pool is not None:
         await _pool.close()
         _pool = None
@@ -55,8 +53,7 @@ async def close_pool() -> None:
 
 async def init_database() -> None:
     """Initialize database schema from migration files."""
-    import importlib.resources as pkg_resources
-    from pathlib import Path
+    from pathlib import Path  # noqa: PLC0415
 
     pool = await get_pool()
 

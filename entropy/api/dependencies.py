@@ -6,7 +6,7 @@ FastAPI's ``Depends()`` system so routes stay thin and testable.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import redis.asyncio as aioredis
 import structlog
@@ -23,6 +23,9 @@ from entropy.providers.openai_provider import OpenAIProvider
 from entropy.services.auth import AuthService
 from entropy.services.rate_limiter import RateLimitService
 from entropy.services.security_logger import SecurityLogger
+
+if TYPE_CHECKING:
+    import redis.asyncio as aioredis
 
 logger = structlog.get_logger(__name__)
 
@@ -74,7 +77,7 @@ def _get_db_pool(request: Request) -> Any:
 
 
 def get_rate_limiter(
-    redis: aioredis.Redis = Depends(_get_redis),
+    redis: aioredis.Redis = Depends(_get_redis),  # noqa: B008
 ) -> RateLimitService:
     return RateLimitService(redis)
 
@@ -101,31 +104,31 @@ def get_provider() -> Any:
 
 
 def get_request_log_repo(
-    pool: Any = Depends(_get_db_pool),
+    pool: Any = Depends(_get_db_pool),  # noqa: B008
 ) -> RequestLogRepository:
     return RequestLogRepository(pool)
 
 
 def get_security_event_repo(
-    pool: Any = Depends(_get_db_pool),
+    pool: Any = Depends(_get_db_pool),  # noqa: B008
 ) -> SecurityEventRepository:
     return SecurityEventRepository(pool)
 
 
 def get_api_key_repo(
-    pool: Any = Depends(_get_db_pool),
+    pool: Any = Depends(_get_db_pool),  # noqa: B008
 ) -> APIKeyRepository:
     return APIKeyRepository(pool)
 
 
 def get_auth_service(
-    repo: APIKeyRepository = Depends(get_api_key_repo),
+    repo: APIKeyRepository = Depends(get_api_key_repo),  # noqa: B008
 ) -> AuthService:
     return AuthService(repo)
 
 
 def get_security_logger(
-    repo: SecurityEventRepository = Depends(get_security_event_repo),
+    repo: SecurityEventRepository = Depends(get_security_event_repo),  # noqa: B008
 ) -> SecurityLogger:
     return SecurityLogger(repo)
 
@@ -137,10 +140,9 @@ def get_security_logger(
 
 async def require_auth(
     request: Request,
-    auth_service: AuthService = Depends(get_auth_service),
+    auth_service: AuthService = Depends(get_auth_service),  # noqa: B008
 ) -> dict[str, Any]:
     """Validate the ``X-API-Key`` header. Returns the key record."""
-    settings = get_settings()
     raw_key = request.headers.get("X-API-Key", "")
 
     if not raw_key:
@@ -163,11 +165,11 @@ async def require_auth(
 # Engine singleton
 # ---------------------------------------------------------------------------
 
-_engine: Optional[EntropyEngine] = None
+_engine: EntropyEngine | None = None
 
 
 def _engine_singleton() -> EntropyEngine:
-    global _engine
+    global _engine  # noqa: PLW0603
     if _engine is None:
         _engine = EntropyEngine()
     return _engine

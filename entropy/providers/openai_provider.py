@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, AsyncIterator, Optional
+from typing import TYPE_CHECKING, Any
 
 import openai
 import structlog
 
 from entropy.providers.base import BaseProvider
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 logger = structlog.get_logger(__name__)
 
@@ -21,7 +24,7 @@ logger = structlog.get_logger(__name__)
 class OpenAIProvider(BaseProvider):
     """Adapter for the OpenAI Chat Completions API."""
 
-    def __init__(self, api_key: str, base_url: Optional[str] = None) -> None:
+    def __init__(self, api_key: str, base_url: str | None = None) -> None:
         self._client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
 
     @property
@@ -33,8 +36,8 @@ class OpenAIProvider(BaseProvider):
         *,
         model: str,
         messages: list[dict[str, Any]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         stream: bool = False,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -74,8 +77,8 @@ class OpenAIProvider(BaseProvider):
         *,
         model: str,
         messages: list[dict[str, Any]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[str]:
         """Streaming chat completion — yields SSE lines."""

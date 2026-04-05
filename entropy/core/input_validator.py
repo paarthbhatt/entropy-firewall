@@ -8,12 +8,14 @@ without consuming resources.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import TYPE_CHECKING
 
 import structlog
 
 from entropy.config import get_settings
-from entropy.models.schemas import ChatCompletionRequest
+
+if TYPE_CHECKING:
+    from entropy.models.schemas import ChatCompletionRequest
 
 logger = structlog.get_logger(__name__)
 
@@ -27,11 +29,11 @@ class ValidationResult:
     warnings: list[str]
 
     @staticmethod
-    def ok() -> "ValidationResult":
+    def ok() -> ValidationResult:
         return ValidationResult(is_valid=True, errors=[], warnings=[])
 
     @staticmethod
-    def fail(errors: list[str], warnings: list[str] | None = None) -> "ValidationResult":
+    def fail(errors: list[str], warnings: list[str] | None = None) -> ValidationResult:
         return ValidationResult(is_valid=False, errors=errors, warnings=warnings or [])
 
 
@@ -62,9 +64,7 @@ class InputValidator:
 
         # 3. Special character ratio
         if total_text:
-            special_count = sum(
-                1 for ch in total_text if not ch.isalnum() and not ch.isspace()
-            )
+            special_count = sum(1 for ch in total_text if not ch.isalnum() and not ch.isspace())
             ratio = special_count / len(total_text)
             if ratio > self.settings.max_special_chars_ratio:
                 warnings.append(
@@ -73,19 +73,14 @@ class InputValidator:
                 )
 
         # 4. Empty content check
-        has_content = any(
-            m.content for m in request.messages if m.role in ("user", "system")
-        )
+        has_content = any(m.content for m in request.messages if m.role in ("user", "system"))
         if not has_content:
             errors.append("Request contains no user/system content")
 
         # 5. Encoding sanity (basic — check for null bytes / control chars)
         if "\x00" in total_text:
             errors.append("Input contains null bytes")
-        control_count = sum(
-            1 for ch in total_text
-            if ord(ch) < 32 and ch not in ("\n", "\r", "\t")
-        )
+        control_count = sum(1 for ch in total_text if ord(ch) < 32 and ch not in ("\n", "\r", "\t"))
         if control_count > 0:
             warnings.append(f"Input contains {control_count} control characters")
 

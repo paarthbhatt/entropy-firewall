@@ -7,13 +7,14 @@ key is matched by prefix, then verified against the stored hash.
 from __future__ import annotations
 
 import secrets
-from typing import Any, Optional
+from datetime import UTC
+from typing import Any
 
 import structlog
 from passlib.hash import bcrypt
 
 from entropy.config import get_settings
-from entropy.db.repository import APIKeyRepository
+from entropy.db.repository import APIKeyRepository  # noqa: TC001
 
 logger = structlog.get_logger(__name__)
 
@@ -45,7 +46,7 @@ class AuthService:
         self.repo = repo
         self._master_key = get_settings().master_api_key
 
-    async def authenticate(self, raw_key: str) -> Optional[dict[str, Any]]:
+    async def authenticate(self, raw_key: str) -> dict[str, Any] | None:
         """Authenticate an API key.
 
         Returns the key record dict if valid, ``None`` otherwise.
@@ -77,9 +78,9 @@ class AuthService:
 
         # Check expiry
         if record.get("expires_at") is not None:
-            from datetime import datetime, timezone
+            from datetime import datetime  # noqa: PLC0415
 
-            if record["expires_at"] < datetime.now(timezone.utc):
+            if record["expires_at"] < datetime.now(UTC):
                 logger.warning("API key expired", prefix=prefix)
                 return None
 
@@ -88,8 +89,8 @@ class AuthService:
     async def create_key(
         self,
         name: str,
-        user_id: Optional[str] = None,
-        rate_limit_rpm: Optional[int] = None,
+        user_id: str | None = None,
+        rate_limit_rpm: int | None = None,
     ) -> tuple[str, str]:
         """Create a new API key. Returns (key_id, raw_key)."""
         raw = generate_api_key()

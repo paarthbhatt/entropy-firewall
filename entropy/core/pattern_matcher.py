@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 import structlog
 
@@ -34,7 +33,7 @@ class DetectionResult:
     pattern_category: str
     confidence: float
     matched_text: str = ""
-    details: Optional[str] = None
+    details: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +51,7 @@ class PatternMatcher:
 
     # ---- Pattern definitions ------------------------------------------------
     # Each category -> list of (name, regex_string, threat_level)
-    _RAW_PATTERNS: dict[str, list[tuple[str, str, ThreatLevel]]] = {
+    _RAW_PATTERNS: dict[str, list[tuple[str, str, ThreatLevel]]] = {  # noqa: RUF012
         # -- Direct Prompt Injection -------------------------------------------
         "direct_injection": [
             (
@@ -263,7 +262,7 @@ class PatternMatcher:
                     )
         return results
 
-    def analyze(self, text: str) -> Tuple[bool, float, list[DetectionResult], ThreatLevel]:
+    def analyze(self, text: str) -> tuple[bool, float, list[DetectionResult], ThreatLevel]:
         """High-level analysis — returns aggregate verdict.
 
         Returns:

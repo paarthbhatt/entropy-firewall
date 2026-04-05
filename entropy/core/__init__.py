@@ -11,7 +11,9 @@ except ImportError:  # pragma: no cover
     ContextAnalyzer = None  # type: ignore[assignment]
 
 try:
-    from entropy_pro.core.indirect_injection_detector import IndirectInjectionDetector  # type: ignore[import]
+    from entropy_pro.core.indirect_injection_detector import (
+        IndirectInjectionDetector,  # type: ignore[import]
+    )
 except ImportError:  # pragma: no cover
     IndirectInjectionDetector = None  # type: ignore[assignment]
 

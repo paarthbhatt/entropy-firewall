@@ -8,11 +8,14 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from typing import Any, AsyncIterator, Optional
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from entropy.providers.base import BaseProvider
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 logger = structlog.get_logger(__name__)
 
@@ -27,7 +30,7 @@ class AnthropicProvider(BaseProvider):
     def __init__(
         self,
         api_key: str,
-        base_url: Optional[str] = None,
+        base_url: str | None = None,
     ) -> None:
         """Initialize Anthropic provider.
 
@@ -36,11 +39,10 @@ class AnthropicProvider(BaseProvider):
             base_url: Optional base URL (for proxies)
         """
         try:
-            import anthropic
+            import anthropic  # noqa: PLC0415
         except ImportError as e:
             raise ImportError(
-                "anthropic package not installed. "
-                "Install it with: pip install anthropic"
+                "anthropic package not installed. Install it with: pip install anthropic"
             ) from e
 
         self._client = anthropic.AsyncAnthropic(
@@ -58,8 +60,8 @@ class AnthropicProvider(BaseProvider):
         *,
         model: str,
         messages: list[dict[str, Any]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         stream: bool = False,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -90,10 +92,9 @@ class AnthropicProvider(BaseProvider):
             params["temperature"] = temperature
 
         # Handle stop sequences
-        if "stop" in kwargs and kwargs["stop"]:
+        if kwargs.get("stop"):
             params["stop_sequences"] = (
-                kwargs["stop"] if isinstance(kwargs["stop"], list)
-                else [kwargs["stop"]]
+                kwargs["stop"] if isinstance(kwargs["stop"], list) else [kwargs["stop"]]
             )
 
         start = time.perf_counter()
@@ -119,8 +120,8 @@ class AnthropicProvider(BaseProvider):
         *,
         model: str,
         messages: list[dict[str, Any]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[str]:
         """Streaming chat completion — yields SSE lines in OpenAI format."""
@@ -142,10 +143,9 @@ class AnthropicProvider(BaseProvider):
         if temperature is not None:
             params["temperature"] = temperature
 
-        if "stop" in kwargs and kwargs["stop"]:
+        if kwargs.get("stop"):
             params["stop_sequences"] = (
-                kwargs["stop"] if isinstance(kwargs["stop"], list)
-                else [kwargs["stop"]]
+                kwargs["stop"] if isinstance(kwargs["stop"], list) else [kwargs["stop"]]
             )
 
         completion_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
@@ -163,11 +163,13 @@ class AnthropicProvider(BaseProvider):
                                 "object": "chat.completion.chunk",
                                 "created": created,
                                 "model": model,
-                                "choices": [{
-                                    "index": 0,
-                                    "delta": {"content": delta.text},
-                                    "finish_reason": None,
-                                }],
+                                "choices": [
+                                    {
+                                        "index": 0,
+                                        "delta": {"content": delta.text},
+                                        "finish_reason": None,
+                                    }
+                                ],
                             }
                             yield f"data: {json.dumps(chunk)}\n\n"
 
@@ -178,11 +180,13 @@ class AnthropicProvider(BaseProvider):
                             "object": "chat.completion.chunk",
                             "created": created,
                             "model": model,
-                            "choices": [{
-                                "index": 0,
-                                "delta": {},
-                                "finish_reason": "stop",
-                            }],
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "delta": {},
+                                    "finish_reason": "stop",
+                                }
+                            ],
                         }
                         yield f"data: {json.dumps(final_chunk)}\n\n"
 
@@ -190,7 +194,7 @@ class AnthropicProvider(BaseProvider):
 
         except Exception as exc:
             logger.error("Anthropic stream error", error=str(exc))
-            yield f'data: {{"error": "{str(exc)}"}}\n\n'
+            yield f'data: {{"error": "{exc!s}"}}\n\n'
 
     async def close(self) -> None:
         """Close the HTTP client."""
@@ -199,13 +203,13 @@ class AnthropicProvider(BaseProvider):
     def _convert_messages(
         self,
         messages: list[dict[str, Any]],
-    ) -> tuple[Optional[str], list[dict[str, Any]]]:
+    ) -> tuple[str | None, list[dict[str, Any]]]:
         """Convert OpenAI-format messages to Anthropic format.
 
         Anthropic uses separate 'system' param and 'user'/'assistant' roles.
         Returns (system_prompt, anthropic_messages).
         """
-        system_prompt: Optional[str] = None
+        system_prompt: str | None = None
         anthropic_messages: list[dict[str, Any]] = []
 
         for msg in messages:
@@ -248,19 +252,23 @@ class AnthropicProvider(BaseProvider):
                     content_blocks.append({"type": "text", "text": content})
 
                 for tool_call in msg.get("tool_calls", []):
-                    content_blocks.append({
-                        "type": "tool_use",
-                        "id": tool_call.get("id", ""),
-                        "name": tool_call.get("function", {}).get("name", ""),
-                        "input": json.loads(
-                            tool_call.get("function", {}).get("arguments", "{}")
-                        ),
-                    })
+                    content_blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": tool_call.get("id", ""),
+                            "name": tool_call.get("function", {}).get("name", ""),
+                            "input": json.loads(
+                                tool_call.get("function", {}).get("arguments", "{}")
+                            ),
+                        }
+                    )
 
-                anthropic_messages.append({
-                    "role": "assistant",
-                    "content": content_blocks,
-                })
+                anthropic_messages.append(
+                    {
+                        "role": "assistant",
+                        "content": content_blocks,
+                    }
+                )
 
         return system_prompt, anthropic_messages
 
@@ -284,15 +292,18 @@ class AnthropicProvider(BaseProvider):
             "object": "chat.completion",
             "created": int(time.time()),
             "model": model,
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": text_content,
-                },
-                "finish_reason": "stop" if response.stop_reason == "end_turn"
-                                 else response.stop_reason,
-            }],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": text_content,
+                    },
+                    "finish_reason": "stop"
+                    if response.stop_reason == "end_turn"
+                    else response.stop_reason,
+                }
+            ],
             "usage": {
                 "prompt_tokens": response.usage.input_tokens,
                 "completion_tokens": response.usage.output_tokens,

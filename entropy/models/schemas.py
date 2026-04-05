@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
+from enum import StrEnum
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Chat Completion — Request
@@ -19,12 +18,10 @@ class ChatMessage(BaseModel):
     role: Literal["system", "user", "assistant", "tool", "function"] = Field(
         ..., description="Role of the message author"
     )
-    content: Optional[Union[str, list[Any]]] = Field(
-        None, description="Message content (text or multipart)"
-    )
-    name: Optional[str] = None
-    tool_calls: Optional[list[dict[str, Any]]] = None
-    tool_call_id: Optional[str] = None
+    content: str | list[Any] | None = Field(None, description="Message content (text or multipart)")
+    name: str | None = None
+    tool_calls: list[dict[str, Any]] | None = None
+    tool_call_id: str | None = None
 
 
 class ChatCompletionRequest(BaseModel):
@@ -32,14 +29,14 @@ class ChatCompletionRequest(BaseModel):
 
     model: str = Field(..., description="Model to use")
     messages: list[ChatMessage] = Field(..., min_length=1)
-    temperature: Optional[float] = Field(None, ge=0, le=2)
-    top_p: Optional[float] = Field(None, ge=0, le=1)
-    max_tokens: Optional[int] = Field(None, ge=1)
+    temperature: float | None = Field(None, ge=0, le=2)
+    top_p: float | None = Field(None, ge=0, le=1)
+    max_tokens: int | None = Field(None, ge=1)
     stream: bool = Field(default=False)
-    stop: Optional[Union[str, list[str]]] = None
-    presence_penalty: Optional[float] = Field(None, ge=-2, le=2)
-    frequency_penalty: Optional[float] = Field(None, ge=-2, le=2)
-    user: Optional[str] = None
+    stop: str | list[str] | None = None
+    presence_penalty: float | None = Field(None, ge=-2, le=2)
+    frequency_penalty: float | None = Field(None, ge=-2, le=2)
+    user: str | None = None
 
     # Extra kwargs forwarded to the provider
     model_config = {"extra": "allow"}
@@ -50,7 +47,7 @@ class ChatCompletionRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class ThreatLevel(str, Enum):
+class ThreatLevel(StrEnum):
     """Severity of a detected threat."""
 
     SAFE = "safe"
@@ -60,7 +57,7 @@ class ThreatLevel(str, Enum):
     CRITICAL = "critical"
 
 
-class EntropyStatus(str, Enum):
+class EntropyStatus(StrEnum):
     """Overall security status of a request/response."""
 
     ALLOWED = "allowed"
@@ -75,8 +72,8 @@ class ThreatInfo(BaseModel):
     name: str
     threat_level: ThreatLevel
     confidence: float = Field(ge=0, le=1)
-    details: Optional[str] = None
-    suggestion: Optional[str] = Field(
+    details: str | None = None
+    suggestion: str | None = Field(
         default=None, description="Actionable suggestion to fix the issue"
     )
 
@@ -92,15 +89,15 @@ class EntropyVerdict(BaseModel):
     output_sanitized: bool = False
 
     # New fields for better analysis
-    sanitized_content: Optional[str] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    sanitized_content: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     # Actionable suggestion for the developer/user
-    suggestion: Optional[str] = Field(
+    suggestion: str | None = Field(
         default=None, description="Overall actionable suggestion to handle this verdict"
     )
 
-    def get_primary_threat(self) -> Optional[ThreatInfo]:
+    def get_primary_threat(self) -> ThreatInfo | None:
         """Get the highest severity threat."""
         if not self.threats_detected:
             return None
@@ -118,7 +115,7 @@ class ChatCompletionChoice(BaseModel):
 
     index: int = 0
     message: ChatMessage
-    finish_reason: Optional[str] = None
+    finish_reason: str | None = None
 
 
 class CompletionUsage(BaseModel):
@@ -137,7 +134,7 @@ class ChatCompletionResponse(BaseModel):
     created: int
     model: str
     choices: list[ChatCompletionChoice]
-    usage: Optional[CompletionUsage] = None
+    usage: CompletionUsage | None = None
     entropy: EntropyVerdict = Field(
         description="Entropy security verdict for this request/response"
     )
@@ -151,8 +148,8 @@ class ChatCompletionResponse(BaseModel):
 class DeltaMessage(BaseModel):
     """A partial message delta."""
 
-    role: Optional[Literal["system", "user", "assistant", "tool", "function"]] = None
-    content: Optional[str] = None
+    role: Literal["system", "user", "assistant", "tool", "function"] | None = None
+    content: str | None = None
 
 
 class StreamingChoice(BaseModel):
@@ -160,7 +157,7 @@ class StreamingChoice(BaseModel):
 
     index: int
     delta: DeltaMessage
-    finish_reason: Optional[str] = None
+    finish_reason: str | None = None
 
 
 class ChatCompletionChunk(BaseModel):
@@ -171,7 +168,7 @@ class ChatCompletionChunk(BaseModel):
     created: int
     model: str
     choices: list[StreamingChoice]
-    entropy: Optional[EntropyVerdict] = None
+    entropy: EntropyVerdict | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -183,9 +180,9 @@ class ErrorResponse(BaseModel):
     """Standardized error response."""
 
     error: str
-    detail: Optional[str] = None
-    entropy: Optional[EntropyVerdict] = None
-    action_suggestion: Optional[str] = Field(
+    detail: str | None = None
+    entropy: EntropyVerdict | None = None
+    action_suggestion: str | None = Field(
         default=None, description="Actionable suggestion to fix the error"
     )
 
@@ -211,8 +208,8 @@ class APIKeyCreateRequest(BaseModel):
     """Request body for creating a new API key."""
 
     name: str = Field(..., min_length=1, max_length=255)
-    user_id: Optional[str] = None
-    rate_limit_rpm: Optional[int] = Field(None, ge=1)
+    user_id: str | None = None
+    rate_limit_rpm: int | None = Field(None, ge=1)
 
 
 class APIKeyCreateResponse(BaseModel):

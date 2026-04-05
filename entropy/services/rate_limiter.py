@@ -7,12 +7,15 @@ Falls back to an in-memory counter when Redis is unavailable.
 from __future__ import annotations
 
 import time
-from typing import Any, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 import redis.asyncio as aioredis
 import structlog
 
 from entropy.config import get_settings
+
+if TYPE_CHECKING:
+    import redis.asyncio as aioredis
 
 logger = structlog.get_logger(__name__)
 
@@ -32,7 +35,7 @@ class RateLimiter:
         limit: int,
         window_seconds: int,
         burst: int = 0,
-    ) -> Tuple[bool, dict[str, Any]]:
+    ) -> tuple[bool, dict[str, Any]]:
         """Check if the request is within the rate limit.
 
         Returns:
@@ -97,9 +100,9 @@ class RateLimitService:
     async def check(
         self,
         *,
-        api_key_id: Optional[str] = None,
+        api_key_id: str | None = None,
         client_ip: str = "unknown",
-    ) -> Tuple[bool, dict[str, Any]]:
+    ) -> tuple[bool, dict[str, Any]]:
         """Run all configured rate-limit checks.
 
         Returns:
@@ -132,9 +135,7 @@ class RateLimitService:
         overall = all(allowed for _, allowed, _ in checks)
         combined: dict[str, Any] = {
             "allowed": overall,
-            "checks": {
-                name: info for name, _, info in checks
-            },
+            "checks": {name: info for name, _, info in checks},
         }
         if not overall:
             combined["exceeded"] = [name for name, ok, _ in checks if not ok]

@@ -6,13 +6,12 @@ LLM providers based on model name prefixes or explicit configuration.
 
 from __future__ import annotations
 
-import re
-from typing import Any, Optional, Type
+from typing import Any
 
 import structlog
 
 from entropy.config import get_settings
-from entropy.providers.base import BaseProvider
+from entropy.providers.base import BaseProvider  # noqa: TC001
 from entropy.providers.openai_provider import OpenAIProvider
 
 logger = structlog.get_logger(__name__)
@@ -25,73 +24,110 @@ MODEL_PREFIX_MAP: dict[str, str] = {
     "o1-": "openai",
     "o3-": "openai",
     "chatgpt-": "openai",
-
     # Anthropic models
     "claude-": "anthropic",
     "claude2-": "anthropic",
     "claude3-": "anthropic",
-
     # Google models
     "gemini-": "google",
     "gemini": "google",
     "palm-": "google",
-
     # Groq models
     "llama-": "groq",
     "mixtral-": "groq",
     "gemma-": "groq",
-
     # OpenRouter (catch-all, requires explicit header)
     # OpenRouter uses the model name as the full path
 }
 
 # Provider class registry (lazy-loaded to avoid import errors)
-_PROVIDER_CLASSES: dict[str, Type[BaseProvider]] = {
+_PROVIDER_CLASSES: dict[str, type[BaseProvider]] = {
     "openai": OpenAIProvider,
 }
 
 
-def _load_anthropic_provider() -> Optional[Type[BaseProvider]]:
+def _load_anthropic_provider() -> type[BaseProvider] | None:
     """Lazily load Anthropic provider."""
     try:
-        from entropy.providers.anthropic_provider import AnthropicProvider
+        from entropy.providers.anthropic_provider import AnthropicProvider  # noqa: PLC0415
+
         return AnthropicProvider
     except ImportError:
         logger.warning("AnthropicProvider not available - install anthropic package")
         return None
 
 
-def _load_google_provider() -> Optional[Type[BaseProvider]]:
+def _load_google_provider() -> type[BaseProvider] | None:
     """Lazily load Google provider."""
     try:
-        from entropy.providers.google_provider import GoogleProvider
+        from entropy.providers.google_provider import GoogleProvider  # noqa: PLC0415
+
         return GoogleProvider
     except ImportError:
         logger.warning("GoogleProvider not available - install google-generativeai package")
         return None
 
 
-def _load_groq_provider() -> Optional[Type[BaseProvider]]:
+def _load_groq_provider() -> type[BaseProvider] | None:
     """Lazily load Groq provider."""
     try:
-        from entropy.providers.groq_provider import GroqProvider
+        from entropy.providers.groq_provider import GroqProvider  # noqa: PLC0415
+
         return GroqProvider
     except ImportError:
         logger.warning("GroqProvider not available - install groq package")
         return None
 
 
-def _load_openrouter_provider() -> Optional[Type[BaseProvider]]:
+def _load_openrouter_provider() -> type[BaseProvider] | None:
     """Lazily load OpenRouter provider."""
     try:
-        from entropy.providers.openrouter_provider import OpenRouterProvider
+        from entropy.providers.openrouter_provider import OpenRouterProvider  # noqa: PLC0415
+
         return OpenRouterProvider
     except ImportError:
         logger.warning("OpenRouterProvider not available")
         return None
 
 
-def get_provider_class(name: str) -> Optional[Type[BaseProvider]]:
+def _load_google_provider() -> type[BaseProvider] | None:
+    """Lazily load Google provider."""
+    try:
+        from entropy.providers.google_provider import (  # noqa: PLC0415
+            GoogleProvider,
+        )
+
+        return GoogleProvider
+    except ImportError:
+        logger.warning("GoogleProvider not available - install google-generativeai package")
+        return None
+
+
+def _load_groq_provider() -> type[BaseProvider] | None:
+    """Lazily load Groq provider."""
+    try:
+        from entropy.providers.groq_provider import GroqProvider  # noqa: PLC0415
+
+        return GroqProvider
+    except ImportError:
+        logger.warning("GroqProvider not available - install groq package")
+        return None
+
+
+def _load_openrouter_provider() -> type[BaseProvider] | None:
+    """Lazily load OpenRouter provider."""
+    try:
+        from entropy.providers.openrouter_provider import (  # noqa: PLC0415
+            OpenRouterProvider,
+        )
+
+        return OpenRouterProvider
+    except ImportError:
+        logger.warning("OpenRouterProvider not available")
+        return None
+
+
+def get_provider_class(name: str) -> type[BaseProvider] | None:
     """Get a provider class by name with lazy loading.
 
     Args:
@@ -136,7 +172,7 @@ class ProviderRegistry:
         self._instances: dict[str, BaseProvider] = {}
         self._settings = get_settings()
 
-    def detect_provider(self, model: str, override: Optional[str] = None) -> str:
+    def detect_provider(self, model: str, override: str | None = None) -> str:
         """Detect which provider should handle a given model.
 
         Detection order:
@@ -174,9 +210,9 @@ class ProviderRegistry:
     def get_provider(
         self,
         model: str,
-        provider_override: Optional[str] = None,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        provider_override: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
     ) -> BaseProvider:
         """Get or create a provider instance for the given model.
 
@@ -242,7 +278,7 @@ class ProviderRegistry:
 
         return instance
 
-    def _get_api_key(self, provider_name: str) -> Optional[str]:
+    def _get_api_key(self, provider_name: str) -> str | None:
         """Get API key for provider from settings."""
         key_map = {
             "openai": "openai_api_key",
@@ -260,13 +296,14 @@ class ProviderRegistry:
                 return key
 
             # Try environment variable
-            import os
+            import os  # noqa: PLC0415
+
             env_key = provider_name.upper() + "_API_KEY"
             return os.environ.get(env_key)
 
         return None
 
-    def _get_base_url(self, provider_name: str) -> Optional[str]:
+    def _get_base_url(self, provider_name: str) -> str | None:
         """Get base URL for provider from settings."""
         url_map = {
             "openai": "openai_base_url",
@@ -321,20 +358,20 @@ class ProviderRegistry:
 
 
 # Singleton registry instance
-_registry: Optional[ProviderRegistry] = None
+_registry: ProviderRegistry | None = None
 
 
 def get_registry() -> ProviderRegistry:
     """Get the singleton provider registry."""
-    global _registry
+    global _registry  # noqa: PLW0603
     if _registry is None:
         _registry = ProviderRegistry()
     return _registry
 
 
 __all__ = [
-    "ProviderRegistry",
-    "get_registry",
-    "get_provider_class",
     "MODEL_PREFIX_MAP",
+    "ProviderRegistry",
+    "get_provider_class",
+    "get_registry",
 ]

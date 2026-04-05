@@ -5,15 +5,14 @@ Wires up all routes, middleware, lifespan events, and error handlers.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager, suppress
 
 import redis.asyncio as aioredis
 import structlog
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from entropy.api.middleware import RequestLoggingMiddleware, TimingMiddleware
 from entropy.api.routes import admin, chat, health
@@ -85,10 +84,9 @@ async def lifespan(app: FastAPI):
 
     # -- Shutdown --
     logger.info("Shutting down Entropy")
-    try:
+
+    with suppress(Exception):
         await app.state.redis.close()
-    except Exception:
-        pass
     await close_pool()
 
 

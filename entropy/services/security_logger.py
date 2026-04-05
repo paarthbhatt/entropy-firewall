@@ -6,11 +6,11 @@ Optionally writes to PostgreSQL via the SecurityEventRepository.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
-from entropy.db.repository import SecurityEventRepository
+from entropy.db.repository import SecurityEventRepository  # noqa: TC001
 
 logger = structlog.get_logger("entropy.security")
 
@@ -18,7 +18,7 @@ logger = structlog.get_logger("entropy.security")
 class SecurityLogger:
     """High-level security event logger."""
 
-    def __init__(self, repo: Optional[SecurityEventRepository] = None) -> None:
+    def __init__(self, repo: SecurityEventRepository | None = None) -> None:
         self.repo = repo
 
     async def log_attack_blocked(
@@ -27,7 +27,7 @@ class SecurityLogger:
         client_ip: str,
         threats: list[dict[str, Any] | Any],
         confidence: float,
-        request_log_id: Optional[str] = None,
+        request_log_id: str | None = None,
     ) -> None:
         """Log a blocked attack."""
         normalized_threats = [t.model_dump() if hasattr(t, "model_dump") else t for t in threats]
@@ -52,7 +52,7 @@ class SecurityLogger:
         *,
         client_ip: str,
         exceeded: list[str],
-        request_log_id: Optional[str] = None,
+        request_log_id: str | None = None,
     ) -> None:
         """Log a rate-limit violation."""
         logger.warning(
@@ -75,7 +75,7 @@ class SecurityLogger:
         client_ip: str,
         detections: list[dict[str, Any]],
         direction: str = "output",
-        request_log_id: Optional[str] = None,
+        request_log_id: str | None = None,
     ) -> None:
         """Log PII/secret detection in output."""
         logger.info(
@@ -99,7 +99,7 @@ class SecurityLogger:
         client_ip: str,
         status: str,
         processing_ms: float,
-        model: Optional[str] = None,
+        model: str | None = None,
     ) -> None:
         """Log a normal request (for audit trailing)."""
         logger.info(

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import structlog
 
@@ -52,7 +52,7 @@ class OutputFilter:
             rules += self._pii_rules()
         rules += self._secret_rules()
         rules += self._leakage_rules()
-        
+
         self.rules = rules
 
     @staticmethod
@@ -60,9 +60,7 @@ class OutputFilter:
         return [
             SanitizationRule(
                 name="email",
-                pattern=re.compile(
-                    r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b"
-                ),
+                pattern=re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b"),
                 replacement="[EMAIL_REDACTED]",
                 description="Email address",
                 category="pii",
@@ -147,9 +145,7 @@ class OutputFilter:
             ),
             SanitizationRule(
                 name="private_key",
-                pattern=re.compile(
-                    r"-----BEGIN\s+(?:RSA\s+|EC\s+|DSA\s+)?PRIVATE\s+KEY-----"
-                ),
+                pattern=re.compile(r"-----BEGIN\s+(?:RSA\s+|EC\s+|DSA\s+)?PRIVATE\s+KEY-----"),
                 replacement="[PRIVATE_KEY_REDACTED]",
                 description="PEM private key header",
                 category="secret",
@@ -185,22 +181,21 @@ class OutputFilter:
 
     # ---- Public API --------------------------------------------------------
 
-    def filter(self, text: str) -> Tuple[str, list[dict[str, Any]]]:
+    def filter(self, text: str) -> tuple[str, list[dict[str, Any]]]:
         """Apply all rules — returns (sanitized_text, detections)."""
         if not text:
             return text, []
 
         detections: list[dict[str, Any]] = []
         sanitized = text
-        sanitized_copy = text  # To match finditer results accurately
 
-        # We need to be careful: if we modify 'sanitized' in place, 
+        # We need to be careful: if we modify 'sanitized' in place,
         # previous finditer indices might be invalid for subsequent rules.
         # However, regex replacement is usually safe if careful.
         # But for accurate detection reporting, we process rules sequentially.
 
         matches_found = False
-        
+
         for rule in self.rules:
             # First find matches to report them
             current_matches = list(rule.pattern.finditer(sanitized))
@@ -213,7 +208,9 @@ class OutputFilter:
                         "category": rule.category,
                         "description": rule.description,
                         "count": len(unique_samples),
-                        "samples": [s[:50] + "..." if len(s) > 50 else s for s in list(unique_samples)[:3]],
+                        "samples": [
+                            s[:50] + "..." if len(s) > 50 else s for s in list(unique_samples)[:3]
+                        ],
                     }
                 )
                 # Then apply replacement
@@ -234,11 +231,7 @@ class OutputFilter:
         return detections
 
     def add_custom_pattern(
-        self, 
-        name: str, 
-        pattern: str, 
-        replacement: str = "[REDACTED]", 
-        category: str = "custom"
+        self, name: str, pattern: str, replacement: str = "[REDACTED]", category: str = "custom"
     ) -> None:
         """Add a custom rule at runtime (from API/CLI)."""
         try:
@@ -254,4 +247,4 @@ class OutputFilter:
             logger.info("Custom output rule added", name=name)
         except re.error as e:
             logger.error("Failed to add custom output rule", name=name, error=str(e))
-            raise ValueError(f"Invalid regex for custom rule: {e}")
+            raise ValueError(f"Invalid regex for custom rule: {e}") from None

@@ -8,11 +8,11 @@ from entropy.db.repository import (
 )
 
 __all__ = [
+    "APIKeyRepository",
+    "RequestLogRepository",
+    "SecurityEventRepository",
     "close_pool",
     "create_pool",
     "get_pool",
     "init_database",
-    "APIKeyRepository",
-    "RequestLogRepository",
-    "SecurityEventRepository",
 ]

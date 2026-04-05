@@ -5,13 +5,13 @@ from __future__ import annotations
 import time
 
 from fastapi import APIRouter, Depends, Request
+from starlette.responses import Response
 
 from entropy.api.dependencies import get_engine
 from entropy.config import get_settings
-from entropy.core.engine import EntropyEngine
+from entropy.core.engine import EntropyEngine  # noqa: TC001
 from entropy.models.schemas import HealthResponse
 from entropy.services.metrics import PATTERNS_LOADED, get_metrics_text
-from starlette.responses import Response
 
 router = APIRouter(tags=["system"])
 
@@ -22,7 +22,7 @@ _start_time = time.time()
 @router.get("/health", response_model=HealthResponse)
 async def health_check(
     request: Request,
-    engine: EntropyEngine = Depends(get_engine),
+    engine: EntropyEngine = Depends(get_engine),  # noqa: B008
 ) -> HealthResponse:
     """Health check endpoint."""
     settings = get_settings()

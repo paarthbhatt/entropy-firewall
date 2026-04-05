@@ -22,7 +22,7 @@ def client():
 
     Note: lifespan events run, Redis/DB may fail gracefully.
     """
-    from entropy.api.app import create_app
+    from entropy.api.app import create_app  # noqa: PLC0415
 
     app = create_app()
     with TestClient(app, raise_server_exceptions=False) as c:
@@ -32,7 +32,7 @@ def client():
 @pytest.fixture(autouse=True)
 def _clear_settings_cache():
     """Ensure env var overrides in this module are reflected in settings."""
-    from entropy.config.settings import get_settings
+    from entropy.config.settings import get_settings  # noqa: PLC0415
 
     get_settings.cache_clear()
     yield

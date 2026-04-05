@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, AsyncIterator, Optional
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from entropy.providers.base import BaseProvider
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 logger = structlog.get_logger(__name__)
 
@@ -33,9 +36,9 @@ class OpenRouterProvider(BaseProvider):
     def __init__(
         self,
         api_key: str,
-        base_url: Optional[str] = None,
-        site_url: Optional[str] = None,
-        provider_name: Optional[str] = None,
+        base_url: str | None = None,
+        site_url: str | None = None,
+        provider_name: str | None = None,
     ) -> None:
         """Initialize OpenRouter provider.
 
@@ -46,11 +49,10 @@ class OpenRouterProvider(BaseProvider):
             provider_name: Optional provider name for rankings
         """
         try:
-            import openai
+            import openai  # noqa: PLC0415
         except ImportError as e:
             raise ImportError(
-                "openai package not installed. "
-                "Install it with: pip install openai"
+                "openai package not installed. Install it with: pip install openai"
             ) from e
 
         self._base_url = base_url or OPENROUTER_BASE_URL
@@ -79,8 +81,8 @@ class OpenRouterProvider(BaseProvider):
         *,
         model: str,
         messages: list[dict[str, Any]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         stream: bool = False,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -137,8 +139,8 @@ class OpenRouterProvider(BaseProvider):
         *,
         model: str,
         messages: list[dict[str, Any]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[str]:
         """Streaming chat completion — yields SSE lines."""
@@ -166,7 +168,7 @@ class OpenRouterProvider(BaseProvider):
 
         except Exception as exc:
             logger.error("OpenRouter stream error", error=str(exc))
-            yield f'data: {{"error": "{str(exc)}"}}\n\n'
+            yield f'data: {{"error": "{exc!s}"}}\n\n'
 
     async def close(self) -> None:
         """Close the HTTP client."""

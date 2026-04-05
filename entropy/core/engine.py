@@ -15,7 +15,7 @@ starts cleanly when the `entropy-pro` package is not installed.
 from __future__ import annotations
 
 import time
-from typing import Any, List, Optional
+from typing import Any
 
 import structlog
 
@@ -38,28 +38,40 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 try:
-    from entropy_pro.core.context_analyzer import ContextAnalyzer as _ContextAnalyzer  # type: ignore[import]
+    from entropy_pro.core.context_analyzer import (
+        ContextAnalyzer as _ContextAnalyzer,  # type: ignore[import]
+    )
+
     _HAS_CONTEXT = True
 except ImportError:
     _ContextAnalyzer = None  # type: ignore[assignment,misc]
     _HAS_CONTEXT = False
 
 try:
-    from entropy_pro.core.semantic_analyzer import SemanticAnalyzer as _SemanticAnalyzer  # type: ignore[import]
+    from entropy_pro.core.semantic_analyzer import (
+        SemanticAnalyzer as _SemanticAnalyzer,  # type: ignore[import]
+    )
+
     _HAS_SEMANTIC = True
 except ImportError:
     _SemanticAnalyzer = None  # type: ignore[assignment,misc]
     _HAS_SEMANTIC = False
 
 try:
-    from entropy_pro.core.input_sanitizer import InputSanitizer as _InputSanitizer  # type: ignore[import]
+    from entropy_pro.core.input_sanitizer import (
+        InputSanitizer as _InputSanitizer,  # type: ignore[import]
+    )
+
     _HAS_SANITIZER = True
 except ImportError:
     _InputSanitizer = None  # type: ignore[assignment,misc]
     _HAS_SANITIZER = False
 
 try:
-    from entropy_pro.core.indirect_injection_detector import IndirectInjectionDetector as _IndirectDetector  # type: ignore[import]
+    from entropy_pro.core.indirect_injection_detector import (
+        IndirectInjectionDetector as _IndirectDetector,  # type: ignore[import]
+    )
+
     _HAS_INDIRECT = True
 except ImportError:
     _IndirectDetector = None  # type: ignore[assignment,misc]
@@ -79,11 +91,15 @@ _LEVEL_PRIORITY: dict[ThreatLevel, int] = {
 
 _SUGGESTIONS: dict[str, dict[str, str]] = {
     "direct_injection": {
-        "ignore_instructions": "Remove phrases like 'ignore previous instructions' from user input before sending to the LLM.",
-        "system_prompt_extract": "Block this request immediately — it attempts to extract your system prompt.",
+        "ignore_instructions": (
+            "Remove phrases like 'ignore previous instructions' from user input."
+        ),
+        "system_prompt_extract": (
+            "Block this request — it attempts to extract your system prompt."
+        ),
         "act_as": "Requests asking you to 'act as' are a common jailbreak technique.",
-        "new_instructions": "Reject requests that claim to provide 'new' or 'actual' instructions.",
-        "developer_mode": "Developer/admin mode requests are almost always jailbreak attempts.",
+        "new_instructions": "Reject requests that claim to provide 'new' instructions.",
+        "developer_mode": ("Developer/admin mode requests are almost always jailbreak attempts."),
     },
     "jailbreak": {
         "dan_attack": "Known jailbreak attempt (DAN). Block immediately.",
@@ -93,7 +109,9 @@ _SUGGESTIONS: dict[str, dict[str, str]] = {
     },
     "data_exfiltration": {
         "credential_request": "Never process requests for credentials, API keys, or secrets.",
-        "training_data_extraction": "Requests about training data are attempting data exfiltration.",
+        "training_data_extraction": (
+            "Requests about training data are attempting data exfiltration."
+        ),
         "pii_request": "Block requests for personally identifiable information.",
     },
     "code_injection": {
@@ -127,7 +145,7 @@ def _generate_suggestion(threat: ThreatInfo) -> str:
     if cat in _SUGGESTIONS:
         if name in _SUGGESTIONS[cat]:
             return _SUGGESTIONS[cat][name]
-        return list(_SUGGESTIONS[cat].values())[0]
+        return next(iter(_SUGGESTIONS[cat].values()))
     defaults = {
         ThreatLevel.CRITICAL: "Critical threat. Block the request and log for review.",
         ThreatLevel.HIGH: "High threat. Consider blocking or sanitizing.",
@@ -140,6 +158,7 @@ def _generate_suggestion(threat: ThreatInfo) -> str:
 # ---------------------------------------------------------------------------
 # Engine
 # ---------------------------------------------------------------------------
+
 
 class EntropyEngine:
     """Core security engine that coordinates all detection layers.
@@ -219,7 +238,7 @@ class EntropyEngine:
 
     # ---- Public API --------------------------------------------------------
 
-    async def analyze_request(
+    async def analyze_request(  # noqa: PLR0912
         self,
         request: ChatCompletionRequest,
         conversation_history: list[dict[str, Any]] | None = None,
@@ -242,7 +261,9 @@ class EntropyEngine:
                     details="; ".join(validation.errors),
                 )
             )
-            return self._build_verdict(EntropyStatus.BLOCKED, 1.0, threats, start, input_valid=False)
+            return self._build_verdict(
+                EntropyStatus.BLOCKED, 1.0, threats, start, input_valid=False
+            )
 
         # 2. Extract text
         text = self._extract_text(request)
@@ -309,7 +330,9 @@ class EntropyEngine:
                             details=issue,
                         )
                     )
-                max_conf = min(1.0, max_conf + ctx_conf * 0.2) if is_malicious else max(max_conf, ctx_conf)
+                max_conf = (
+                    min(1.0, max_conf + ctx_conf * 0.2) if is_malicious else max(max_conf, ctx_conf)
+                )
                 if _LEVEL_PRIORITY[ctx_level] > _LEVEL_PRIORITY[max_level]:
                     max_level = ctx_level
 
@@ -356,7 +379,9 @@ class EntropyEngine:
 
     # ---- Private helpers ---------------------------------------------------
 
-    def _decide(self, confidence: float, max_level: ThreatLevel, threats: list[ThreatInfo]) -> EntropyStatus:
+    def _decide(
+        self, confidence: float, max_level: ThreatLevel, threats: list[ThreatInfo]
+    ) -> EntropyStatus:
         if not threats:
             return EntropyStatus.ALLOWED
         level_prio = _LEVEL_PRIORITY.get(max_level, 0)

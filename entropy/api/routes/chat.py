@@ -8,8 +8,7 @@ This is where the full Entropy pipeline runs:
 from __future__ import annotations
 
 import time
-import json
-from typing import Any, AsyncGenerator
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -23,28 +22,30 @@ from entropy.api.dependencies import (
     get_security_logger,
     require_auth,
 )
-from entropy.core.engine import EntropyEngine
-from entropy.db.repository import RequestLogRepository
+from entropy.core.engine import EntropyEngine  # noqa: TC001
+from entropy.db.repository import RequestLogRepository  # noqa: TC001
 from entropy.models.schemas import (
     ChatCompletionRequest,
     ChatCompletionResponse,
-    ChatCompletionChunk,
     EntropyStatus,
     EntropyVerdict,
     ErrorResponse,
-    ThreatLevel,
-    ModelListResponse,
     ModelInfo,
+    ModelListResponse,
+    ThreatLevel,
 )
-from entropy.providers.openai_provider import OpenAIProvider
+from entropy.providers.openai_provider import OpenAIProvider  # noqa: TC001
 from entropy.services.metrics import (
     ANALYSIS_DURATION,
     OUTPUT_SANITIZATIONS,
     REQUESTS_TOTAL,
     THREATS_DETECTED,
 )
-from entropy.services.rate_limiter import RateLimitService
-from entropy.services.security_logger import SecurityLogger
+from entropy.services.rate_limiter import RateLimitService  # noqa: TC001
+from entropy.services.security_logger import SecurityLogger  # noqa: TC001
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 logger = structlog.get_logger(__name__)
 
@@ -76,8 +77,8 @@ async def legacy_completions() -> Response:
 async def analyze_content(
     request: Request,
     body: dict[str, Any],
-    engine: EntropyEngine = Depends(get_engine),
-    auth_record: dict[str, Any] = Depends(require_auth),
+    engine: EntropyEngine = Depends(get_engine),  # noqa: B008
+    auth_record: dict[str, Any] = Depends(require_auth),  # noqa: B008
 ) -> EntropyVerdict:
     """Standalone content analysis endpoint."""
     text = body.get("text", "")
@@ -100,15 +101,15 @@ async def analyze_content(
         403: {"model": ErrorResponse, "description": "Request blocked by Entropy"},
     },
 )
-async def chat_completions(
+async def chat_completions(  # noqa: PLR0915
     body: ChatCompletionRequest,
     request: Request,
-    auth_record: dict[str, Any] = Depends(require_auth),
-    engine: EntropyEngine = Depends(get_engine),
-    provider: OpenAIProvider = Depends(get_provider),
-    rate_limiter: RateLimitService = Depends(get_rate_limiter),
-    log_repo: RequestLogRepository = Depends(get_request_log_repo),
-    sec_logger: SecurityLogger = Depends(get_security_logger),
+    auth_record: dict[str, Any] = Depends(require_auth),  # noqa: B008
+    engine: EntropyEngine = Depends(get_engine),  # noqa: B008
+    provider: OpenAIProvider = Depends(get_provider),  # noqa: B008
+    rate_limiter: RateLimitService = Depends(get_rate_limiter),  # noqa: B008
+    log_repo: RequestLogRepository = Depends(get_request_log_repo),  # noqa: B008
+    sec_logger: SecurityLogger = Depends(get_security_logger),  # noqa: B008
 ) -> Any:
     """OpenAI-compatible chat completion endpoint with Entropy security."""
     total_start = time.perf_counter()
@@ -228,7 +229,7 @@ async def chat_completions(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Upstream provider error: {exc}",
-        )
+        ) from exc
     provider_ms = round((time.perf_counter() - provider_start) * 1000, 2)
 
     # ---- 4. Output filtering ------------------------------------------------
@@ -288,9 +289,13 @@ async def chat_completions(
             threat_level=(
                 max(
                     (t.threat_level for t in verdict.threats_detected),
-                    key=lambda l: {"safe": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}.get(
-                        l.value, 0
-                    ),
+                    key=lambda threat_level: {
+                        "safe": 0,
+                        "low": 1,
+                        "medium": 2,
+                        "high": 3,
+                        "critical": 4,
+                    }.get(threat_level.value, 0),
                     default=ThreatLevel.SAFE,
                 ).value
                 if verdict.threats_detected
@@ -315,8 +320,8 @@ async def chat_completions(
 @router.get("/v1/telemetry/summary")
 async def telemetry_summary(
     hours: int = 24,
-    auth_record: dict[str, Any] = Depends(require_auth),
-    log_repo: RequestLogRepository = Depends(get_request_log_repo),
+    auth_record: dict[str, Any] = Depends(require_auth),  # noqa: B008
+    log_repo: RequestLogRepository = Depends(get_request_log_repo),  # noqa: B008
 ) -> dict[str, Any]:
     """Authenticated summary endpoint for website/dashboard consumption."""
     if hours < 1 or hours > 24 * 30:
@@ -332,8 +337,8 @@ async def telemetry_summary(
 async def telemetry_threats(
     hours: int = 24,
     limit: int = 8,
-    auth_record: dict[str, Any] = Depends(require_auth),
-    log_repo: RequestLogRepository = Depends(get_request_log_repo),
+    auth_record: dict[str, Any] = Depends(require_auth),  # noqa: B008
+    log_repo: RequestLogRepository = Depends(get_request_log_repo),  # noqa: B008
 ) -> dict[str, Any]:
     """Authenticated top-threat endpoint for website/dashboard consumption."""
     if hours < 1 or hours > 24 * 30:

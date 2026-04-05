@@ -1,20 +1,20 @@
 """SDK package."""
 
 from entropy.sdk.client import (
-    EntropyBlockedError, 
-    EntropyClient, 
     AsyncEntropyClient,
-    EntropyRateLimitError, 
-    EntropyConnectionError
+    EntropyBlockedError,
+    EntropyClient,
+    EntropyConnectionError,
+    EntropyRateLimitError,
 )
-from entropy.sdk.secure import secure_openai, SecureOpenAIClient
+from entropy.sdk.secure import SecureOpenAIClient, secure_openai
 
 __all__ = [
-    "EntropyClient", 
     "AsyncEntropyClient",
-    "EntropyBlockedError", 
-    "EntropyRateLimitError",
+    "EntropyBlockedError",
+    "EntropyClient",
     "EntropyConnectionError",
-    "secure_openai",
+    "EntropyRateLimitError",
     "SecureOpenAIClient",
+    "secure_openai",
 ]

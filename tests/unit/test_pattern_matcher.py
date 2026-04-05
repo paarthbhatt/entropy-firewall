@@ -1,6 +1,7 @@
 """Unit tests for PatternMatcher."""
 
 import pytest
+
 from entropy.core.pattern_matcher import PatternMatcher
 from entropy.models.schemas import ThreatLevel
 
@@ -139,7 +140,7 @@ class TestPatternMatcher:
 
     def test_analyze_safe(self, pattern_matcher: PatternMatcher):
         text = "Tell me about the weather in Paris"
-        is_mal, conf, dets, level = pattern_matcher.analyze(text)
+        is_mal, conf, _dets, level = pattern_matcher.analyze(text)
         assert is_mal is False
         assert conf == 0.0
         assert level == ThreatLevel.SAFE

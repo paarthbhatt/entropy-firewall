@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, AsyncIterator, Generator
+from typing import Any
 
 import pytest
 
@@ -18,7 +18,7 @@ os.environ.setdefault("ENTROPY_REDIS_URL", "redis://localhost:6379/1")
 @pytest.fixture
 def pattern_matcher():
     """Fresh PatternMatcher instance."""
-    from entropy.core.pattern_matcher import PatternMatcher
+    from entropy.core.pattern_matcher import PatternMatcher  # noqa: PLC0415
 
     return PatternMatcher()
 
@@ -26,7 +26,7 @@ def pattern_matcher():
 @pytest.fixture
 def context_analyzer():
     """Fresh ContextAnalyzer instance."""
-    from entropy_pro.core.context_analyzer import ContextAnalyzer  # type: ignore[import]
+    from entropy_pro.core.context_analyzer import ContextAnalyzer  # noqa: PLC0415
 
     return ContextAnalyzer(max_history=10)
 
@@ -34,7 +34,7 @@ def context_analyzer():
 @pytest.fixture
 def output_filter():
     """Fresh OutputFilter instance."""
-    from entropy.core.output_filter import OutputFilter
+    from entropy.core.output_filter import OutputFilter  # noqa: PLC0415
 
     return OutputFilter(enable_pii=True, enable_code=True)
 
@@ -42,7 +42,7 @@ def output_filter():
 @pytest.fixture
 def input_validator():
     """Fresh InputValidator instance."""
-    from entropy.core.input_validator import InputValidator
+    from entropy.core.input_validator import InputValidator  # noqa: PLC0415
 
     return InputValidator()
 
@@ -50,7 +50,7 @@ def input_validator():
 @pytest.fixture
 def engine():
     """Fresh EntropyEngine instance."""
-    from entropy.core.engine import EntropyEngine
+    from entropy.core.engine import EntropyEngine  # noqa: PLC0415
 
     return EntropyEngine()
 

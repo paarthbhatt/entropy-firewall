@@ -9,15 +9,13 @@ Loads settings from (in priority order):
 
 from __future__ import annotations
 
-import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any
 
 import yaml
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 # ---------------------------------------------------------------------------
 # Sub-configs
@@ -31,7 +29,7 @@ class InputValidationSettings(BaseSettings):
 
     max_tokens: int = Field(default=4096, description="Maximum tokens per request")
     max_chars: int = Field(default=32000, description="Maximum characters per request")
-    allowed_encodings: List[str] = Field(default=["utf-8"], description="Allowed text encodings")
+    allowed_encodings: list[str] = Field(default=["utf-8"], description="Allowed text encodings")
     max_special_chars_ratio: float = Field(
         default=0.3, description="Max ratio of special characters to total"
     )
@@ -190,7 +188,7 @@ class Settings(BaseSettings):
     # Server
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000)
-    cors_origins: List[str] = Field(
+    cors_origins: list[str] = Field(
         default=["http://localhost:3000", "http://localhost:8080"],
     )
 
@@ -201,8 +199,8 @@ class Settings(BaseSettings):
     )
 
     # LLM Provider
-    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
-    openai_base_url: Optional[str] = Field(
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    openai_base_url: str | None = Field(
         default=None,
         alias="OPENAI_BASE_URL",
         description="Optional custom base URL for Azure/LocalAI",

@@ -26,11 +26,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Schema Models
@@ -59,7 +58,7 @@ class Rule(BaseModel):
         default_factory=list,
         description="Channel names to apply rule to (empty = all)",
     )
-    mode: Optional[str] = Field(
+    mode: str | None = Field(
         default=None,
         description="Mode for sanitize action (redact, mask, escape)",
     )
@@ -70,7 +69,7 @@ class LearningConfig(BaseModel):
     """Learning mode configuration."""
     
     enabled: bool = Field(default=False, description="Enable learning mode")
-    feedback_webhook: Optional[str] = Field(
+    feedback_webhook: str | None = Field(
         default=None,
         description="Webhook URL for sending feedback",
     )
@@ -94,14 +93,14 @@ class GuardrailsConfig(BaseModel):
         description="Default settings",
     )
     
-    def get_rule(self, name: str) -> Optional[Rule]:
+    def get_rule(self, name: str) -> Rule | None:
         """Get rule by name."""
         for rule in self.rules:
             if rule.name == name:
                 return rule
         return None
     
-    def get_applicable_rules(self, channel: Optional[str] = None) -> list[Rule]:
+    def get_applicable_rules(self, channel: str | None = None) -> list[Rule]:
         """Get rules applicable to a channel."""
         applicable = []
         for rule in self.rules:
@@ -154,8 +153,8 @@ DEFAULT_GUARDRAILS = GuardrailsConfig(
 # ---------------------------------------------------------------------------
 
 def load_guardrails(
-    config_path: Optional[str] = None,
-    search_dirs: Optional[list[str]] = None,
+    config_path: str | None = None,
+    search_dirs: list[str] | None = None,
 ) -> GuardrailsConfig:
     """Load guardrails configuration from YAML file.
     
@@ -294,11 +293,11 @@ defaults:
 
 
 __all__ = [
+    "DEFAULT_GUARDRAILS",
     "GuardrailsConfig",
+    "LearningConfig",
     "Rule",
     "RuleAction",
-    "LearningConfig",
-    "load_guardrails",
     "create_sample_config",
-    "DEFAULT_GUARDRAILS",
+    "load_guardrails",
 ]

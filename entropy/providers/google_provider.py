@@ -9,11 +9,14 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from typing import Any, AsyncIterator, Optional
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from entropy.providers.base import BaseProvider
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 logger = structlog.get_logger(__name__)
 
@@ -28,7 +31,7 @@ class GoogleProvider(BaseProvider):
     def __init__(
         self,
         api_key: str,
-        base_url: Optional[str] = None,
+        base_url: str | None = None,
     ) -> None:
         """Initialize Google provider.
 
@@ -37,7 +40,7 @@ class GoogleProvider(BaseProvider):
             base_url: Optional base URL (for Vertex AI or other proxies)
         """
         try:
-            import google.generativeai as genai
+            import google.generativeai as genai  # noqa: PLC0415
         except ImportError as e:
             raise ImportError(
                 "google-generativeai package not installed. "
@@ -58,8 +61,8 @@ class GoogleProvider(BaseProvider):
         *,
         model: str,
         messages: list[dict[str, Any]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         stream: bool = False,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -73,9 +76,7 @@ class GoogleProvider(BaseProvider):
 
         # Build generation config
         generation_config = self._build_generation_config(
-            temperature=temperature,
-            max_tokens=max_tokens,
-            **kwargs
+            temperature=temperature, max_tokens=max_tokens, **kwargs
         )
 
         # Create model instance
@@ -110,17 +111,15 @@ class GoogleProvider(BaseProvider):
         *,
         model: str,
         messages: list[dict[str, Any]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[str]:
         """Streaming chat completion — yields SSE lines in OpenAI format."""
         system_instruction, contents = self._convert_messages(messages)
 
         generation_config = self._build_generation_config(
-            temperature=temperature,
-            max_tokens=max_tokens,
-            **kwargs
+            temperature=temperature, max_tokens=max_tokens, **kwargs
         )
 
         model_instance = self._genai.GenerativeModel(
@@ -156,11 +155,13 @@ class GoogleProvider(BaseProvider):
                         "object": "chat.completion.chunk",
                         "created": created,
                         "model": model,
-                        "choices": [{
-                            "index": 0,
-                            "delta": {"content": text},
-                            "finish_reason": None,
-                        }],
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {"content": text},
+                                "finish_reason": None,
+                            }
+                        ],
                     }
                     yield f"data: {json.dumps(openai_chunk)}\n\n"
 
@@ -170,18 +171,20 @@ class GoogleProvider(BaseProvider):
                 "object": "chat.completion.chunk",
                 "created": created,
                 "model": model,
-                "choices": [{
-                    "index": 0,
-                    "delta": {},
-                    "finish_reason": "stop",
-                }],
+                "choices": [
+                    {
+                        "index": 0,
+                        "delta": {},
+                        "finish_reason": "stop",
+                    }
+                ],
             }
             yield f"data: {json.dumps(final_chunk)}\n\n"
             yield "data: [DONE]\n\n"
 
         except Exception as exc:
             logger.error("Google stream error", error=str(exc))
-            yield f'data: {{"error": "{str(exc)}"}}\n\n'
+            yield f'data: {{"error": "{exc!s}"}}\n\n'
 
     async def close(self) -> None:
         """Close any resources."""
@@ -191,12 +194,12 @@ class GoogleProvider(BaseProvider):
     def _convert_messages(
         self,
         messages: list[dict[str, Any]],
-    ) -> tuple[Optional[str], list[dict[str, Any]]]:
+    ) -> tuple[str | None, list[dict[str, Any]]]:
         """Convert OpenAI-format messages to Google Gemini format.
 
         Returns (system_instruction, contents).
         """
-        system_instruction: Optional[str] = None
+        system_instruction: str | None = None
         contents: list[dict[str, Any]] = []
 
         for msg in messages:
@@ -220,10 +223,12 @@ class GoogleProvider(BaseProvider):
             else:
                 parts = [{"text": str(content)}]
 
-            contents.append({
-                "role": google_role,
-                "parts": parts,
-            })
+            contents.append(
+                {
+                    "role": google_role,
+                    "parts": parts,
+                }
+            )
 
         return system_instruction, contents
 
@@ -242,19 +247,22 @@ class GoogleProvider(BaseProvider):
                 url = image_url.get("url", "")
                 if url.startswith("data:"):
                     # Base64 encoded image
-                    import base64
-                    import re
+                    import base64  # noqa: PLC0415
+                    import re  # noqa: PLC0415
+
                     # Extract mime type and data
                     match = re.match(r"data:([^;]+);base64,(.+)", url)
                     if match:
                         mime_type, data = match.groups()
                         image_bytes = base64.b64decode(data)
-                        google_parts.append({
-                            "inline_data": {
-                                "mime_type": mime_type,
-                                "data": image_bytes,
+                        google_parts.append(
+                            {
+                                "inline_data": {
+                                    "mime_type": mime_type,
+                                    "data": image_bytes,
+                                }
                             }
-                        })
+                        )
                 else:
                     # URL - Google Gemini may need to fetch it
                     # This is a simplified handling; production code would
@@ -268,8 +276,8 @@ class GoogleProvider(BaseProvider):
 
     def _build_generation_config(
         self,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Build Google generation config from kwargs."""
@@ -289,7 +297,7 @@ class GoogleProvider(BaseProvider):
             config["top_k"] = kwargs["top_k"]
 
         # Handle stop sequences
-        if "stop" in kwargs and kwargs["stop"]:
+        if kwargs.get("stop"):
             stops = kwargs["stop"] if isinstance(kwargs["stop"], list) else [kwargs["stop"]]
             config["stop_sequences"] = stops
 
@@ -333,14 +341,16 @@ class GoogleProvider(BaseProvider):
             "object": "chat.completion",
             "created": int(time.time()),
             "model": model,
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": text_content,
-                },
-                "finish_reason": "stop",
-            }],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": text_content,
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
             "usage": {
                 "prompt_tokens": prompt_tokens,
                 "completion_tokens": completion_tokens,

@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 
-import asyncpg
 import structlog
+
+if TYPE_CHECKING:
+    import asyncpg
 
 logger = structlog.get_logger(__name__)
 
@@ -26,19 +27,19 @@ class RequestLogRepository:
     async def create(
         self,
         *,
-        api_key_id: Optional[str] = None,
+        api_key_id: str | None = None,
         client_ip: str,
         provider: str = "openai",
-        model: Optional[str] = None,
+        model: str | None = None,
         message_count: int = 0,
         input_tokens: int = 0,
         status: str = "allowed",
-        threat_level: Optional[str] = None,
-        confidence: Optional[float] = None,
-        threats: Optional[list[dict[str, Any]]] = None,
+        threat_level: str | None = None,
+        confidence: float | None = None,
+        threats: list[dict[str, Any]] | None = None,
         output_tokens: int = 0,
         output_sanitized: bool = False,
-        sanitizations: Optional[list[dict[str, Any]]] = None,
+        sanitizations: list[dict[str, Any]] | None = None,
         processing_ms: float = 0.0,
         provider_ms: float = 0.0,
         total_ms: float = 0.0,
@@ -187,9 +188,9 @@ class SecurityEventRepository:
         *,
         event_type: str,
         severity: str,
-        details: Optional[dict[str, Any]] = None,
-        client_ip: Optional[str] = None,
-        request_log_id: Optional[str] = None,
+        details: dict[str, Any] | None = None,
+        client_ip: str | None = None,
+        request_log_id: str | None = None,
     ) -> str:
         """Insert a security event. Returns the event ID."""
         event_id = str(uuid.uuid4())
@@ -218,7 +219,7 @@ class APIKeyRepository:
     def __init__(self, pool: asyncpg.Pool) -> None:
         self.pool = pool
 
-    async def find_by_prefix(self, key_prefix: str) -> Optional[dict[str, Any]]:
+    async def find_by_prefix(self, key_prefix: str) -> dict[str, Any] | None:
         """Look up an API key record by its prefix."""
         if self.pool is None:
             return None
@@ -243,8 +244,8 @@ class APIKeyRepository:
         key_hash: str,
         key_prefix: str,
         name: str,
-        user_id: Optional[str] = None,
-        rate_limit_rpm: Optional[int] = None,
+        user_id: str | None = None,
+        rate_limit_rpm: int | None = None,
     ) -> str:
         """Insert a new API key. Returns the key ID."""
         if self.pool is None:

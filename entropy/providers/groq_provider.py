@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, AsyncIterator, Optional
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from entropy.providers.base import BaseProvider
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 logger = structlog.get_logger(__name__)
 
@@ -30,7 +33,7 @@ class GroqProvider(BaseProvider):
     def __init__(
         self,
         api_key: str,
-        base_url: Optional[str] = None,
+        base_url: str | None = None,
     ) -> None:
         """Initialize Groq provider.
 
@@ -39,11 +42,10 @@ class GroqProvider(BaseProvider):
             base_url: Optional base URL override
         """
         try:
-            import openai
+            import openai  # noqa: PLC0415
         except ImportError as e:
             raise ImportError(
-                "openai package not installed. "
-                "Install it with: pip install openai"
+                "openai package not installed. Install it with: pip install openai"
             ) from e
 
         # Use Groq's OpenAI-compatible endpoint
@@ -62,8 +64,8 @@ class GroqProvider(BaseProvider):
         *,
         model: str,
         messages: list[dict[str, Any]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         stream: bool = False,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -112,8 +114,8 @@ class GroqProvider(BaseProvider):
         *,
         model: str,
         messages: list[dict[str, Any]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[str]:
         """Streaming chat completion — yields SSE lines."""
@@ -141,7 +143,7 @@ class GroqProvider(BaseProvider):
 
         except Exception as exc:
             logger.error("Groq stream error", error=str(exc))
-            yield f'data: {{"error": "{str(exc)}"}}\n\n'
+            yield f'data: {{"error": "{exc!s}"}}\n\n'
 
     async def close(self) -> None:
         """Close the HTTP client."""
