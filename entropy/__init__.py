@@ -6,7 +6,7 @@ and filters outputs to protect sensitive data.
 
 Quick Start:
     from entropy import secure_openai
-    
+
     # Protect your OpenAI calls with 3 lines
     client = secure_openai("sk-...", entropy_url="http://localhost:8000")
     response = client.chat.completions.create(model="gpt-4", messages=[...])

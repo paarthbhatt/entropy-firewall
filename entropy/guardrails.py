@@ -15,10 +15,10 @@ Usage:
     learning:
       enabled: true
       feedback-webhook: https://yourapp.com/entropy/feedback
-    
+
     # In your code:
     from entropy.guardrails import load_guardrails
-    
+
     config = load_guardrails("entropy.yaml")
 """
 
@@ -41,7 +41,7 @@ RuleAction = Literal["block", "sanitize", "allow", "log"]
 
 class Rule(BaseModel):
     """Individual guardrail rule."""
-    
+
     name: str = Field(..., description="Unique rule identifier")
     action: RuleAction = Field(default="block", description="Action to take")
     confidence: float = Field(
@@ -67,7 +67,7 @@ class Rule(BaseModel):
 
 class LearningConfig(BaseModel):
     """Learning mode configuration."""
-    
+
     enabled: bool = Field(default=False, description="Enable learning mode")
     feedback_webhook: str | None = Field(
         default=None,
@@ -81,7 +81,7 @@ class LearningConfig(BaseModel):
 
 class GuardrailsConfig(BaseModel):
     """Complete guardrails configuration."""
-    
+
     version: int = Field(default=1, description="Config version")
     rules: list[Rule] = Field(default_factory=list, description="Guardrail rules")
     learning: LearningConfig = Field(
@@ -92,14 +92,14 @@ class GuardrailsConfig(BaseModel):
         default_factory=dict,
         description="Default settings",
     )
-    
+
     def get_rule(self, name: str) -> Rule | None:
         """Get rule by name."""
         for rule in self.rules:
             if rule.name == name:
                 return rule
         return None
-    
+
     def get_applicable_rules(self, channel: str | None = None) -> list[Rule]:
         """Get rules applicable to a channel."""
         applicable = []
@@ -152,19 +152,20 @@ DEFAULT_GUARDRAILS = GuardrailsConfig(
 # Loader Functions
 # ---------------------------------------------------------------------------
 
+
 def load_guardrails(
     config_path: str | None = None,
     search_dirs: list[str] | None = None,
 ) -> GuardrailsConfig:
     """Load guardrails configuration from YAML file.
-    
+
     Args:
         config_path: Specific path to config file
         search_dirs: Directories to search for entropy.yaml
-    
+
     Returns:
         GuardrailsConfig object with loaded rules
-        
+
     Example:
         config = load_guardrails()  # Auto-searches
         config = load_guardrails("my-security-rules.yaml")
@@ -175,7 +176,7 @@ def load_guardrails(
         if path.exists():
             return _load_from_path(path)
         return DEFAULT_GUARDRAILS
-    
+
     # Otherwise search common locations
     search_dirs = search_dirs or [
         ".",
@@ -183,12 +184,12 @@ def load_guardrails(
         Path.cwd().parent,
         Path.home() / ".entropy",
     ]
-    
+
     # Also check ENV var
     env_path = os.environ.get("ENTROPY_GUARDRAILS_PATH")
     if env_path:
         search_dirs.insert(0, env_path)
-    
+
     filenames = [
         "entropy.yaml",
         "entropy.yml",
@@ -196,7 +197,7 @@ def load_guardrails(
         "guardrails.yaml",
         ".entropy.yaml",
     ]
-    
+
     for directory in search_dirs:
         dir_path = Path(directory)
         if not dir_path.exists():
@@ -205,7 +206,7 @@ def load_guardrails(
             full_path = dir_path / filename
             if full_path.exists():
                 return _load_from_path(full_path)
-    
+
     # Return defaults if no config found
     return DEFAULT_GUARDRAILS
 
@@ -215,10 +216,10 @@ def _load_from_path(path: Path) -> GuardrailsConfig:
     try:
         with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
-        
+
         if not isinstance(data, dict):
             return DEFAULT_GUARDRAILS
-        
+
         return GuardrailsConfig(**data)
     except Exception:
         return DEFAULT_GUARDRAILS
@@ -226,7 +227,7 @@ def _load_from_path(path: Path) -> GuardrailsConfig:
 
 def create_sample_config(path: str = "entropy.yaml") -> None:
     """Create a sample guardrails configuration file.
-    
+
     Args:
         path: Where to write the sample config
     """
@@ -285,10 +286,10 @@ defaults:
   block_on_detection: true
   enable_context_analysis: true
 """
-    
+
     with open(path, "w", encoding="utf-8") as f:
         f.write(sample)
-    
+
     print(f"Created sample guardrails config at: {path}")
 
 
