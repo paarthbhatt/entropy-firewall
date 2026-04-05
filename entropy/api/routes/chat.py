@@ -158,11 +158,14 @@ async def chat_completions(  # noqa: PLR0915
 
     if verdict.status == EntropyStatus.BLOCKED:
         REQUESTS_TOTAL.labels(status="blocked", provider="none").inc()
-        await sec_logger.log_attack_blocked(
-            client_ip=client_ip,
-            threats=[t.model_dump() for t in verdict.threats_detected],
-            confidence=verdict.confidence,
-        )
+        try:
+            await sec_logger.log_attack_blocked(
+                client_ip=client_ip,
+                threats=[t.model_dump() for t in verdict.threats_detected],
+                confidence=verdict.confidence,
+            )
+        except Exception as exc:
+            logger.warning("Failed to log attack blocked", error=str(exc))
         return JSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
             content=ErrorResponse(
