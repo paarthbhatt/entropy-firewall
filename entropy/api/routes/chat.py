@@ -103,7 +103,7 @@ async def analyze_content(
         403: {"model": ErrorResponse, "description": "Request blocked by Entropy"},
     },
 )
-async def chat_completions(  # noqa: PLR0915
+async def chat_completions(  # noqa: PLR0912, PLR0915
     body: ChatCompletionRequest,
     request: Request,
     auth_record: dict[str, Any] = Depends(require_auth),  # noqa: B008
