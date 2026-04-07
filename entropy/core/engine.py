@@ -33,63 +33,10 @@ from entropy.models.schemas import (
 
 logger = structlog.get_logger(__name__)
 
-# ---------------------------------------------------------------------------
-# Optional Pro-tier imports
-# ---------------------------------------------------------------------------
-
-
-_HAS_CONTEXT = False
-_HAS_SEMANTIC = False
-_HAS_SANITIZER = False
-_HAS_INDIRECT = False
-_ContextAnalyzer: Any = None
-_SemanticAnalyzer: Any = None
-_InputSanitizer: Any = None
-_IndirectDetector: Any = None
-
-try:
-    from entropy_pro.core.context_analyzer import (
-        ContextAnalyzer as _CtxAna,
-    )
-
-    if _CtxAna is not None:
-        _ContextAnalyzer = _CtxAna
-        _HAS_CONTEXT = True
-except ImportError:
-    pass
-
-try:
-    from entropy_pro.core.semantic_analyzer import (
-        SemanticAnalyzer as _SemAna,
-    )
-
-    if _SemAna is not None:
-        _SemanticAnalyzer = _SemAna
-        _HAS_SEMANTIC = True
-except ImportError:
-    pass
-
-try:
-    from entropy_pro.core.input_sanitizer import (
-        InputSanitizer as _InpSan,
-    )
-
-    if _InpSan is not None:
-        _InputSanitizer = _InpSan
-        _HAS_SANITIZER = True
-except ImportError:
-    pass
-
-try:
-    from entropy_pro.core.indirect_injection_detector import (
-        IndirectInjectionDetector as _IndDet,
-    )
-
-    if _IndDet is not None:
-        _IndirectDetector = _IndDet
-        _HAS_INDIRECT = True
-except ImportError:
-    pass
+from entropy.core.context_analyzer import ContextAnalyzer  # noqa: E402
+from entropy.core.indirect_injection_detector import IndirectInjectionDetector  # noqa: E402
+from entropy.core.input_sanitizer import InputSanitizer  # noqa: E402
+from entropy.core.semantic_analyzer import SemanticAnalyzer  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Threat-level helpers
@@ -205,49 +152,38 @@ class EntropyEngine:
             enable_code=settings.output_filter.code_scanning,
         )
 
-        # --- Pro tier components (loaded if entropy-pro is installed) ---
-        self._context_analyzer = None
-        self._semantic_analyzer = None
-        self._input_sanitizer = None
-        self._indirect_detector = None
+        # --- Advanced components (formerly Enterprise) ---
+        self._input_sanitizer = InputSanitizer(
+            max_depth=settings.engine.max_decode_depth,
+            enabled=settings.engine.enable_recursive_decoding,
+        )
 
-        if _HAS_SANITIZER:
-            self._input_sanitizer = _InputSanitizer(
-                max_depth=settings.engine.max_decode_depth,
-                enabled=settings.engine.enable_recursive_decoding,
-            )
+        self._indirect_detector = IndirectInjectionDetector(
+            pattern_matcher=self.pattern_matcher,
+            input_sanitizer=self._input_sanitizer,
+            fetch_urls=settings.engine.fetch_urls_for_analysis,
+        )
 
-        if _HAS_INDIRECT and self._input_sanitizer is not None:
-            self._indirect_detector = _IndirectDetector(
-                pattern_matcher=self.pattern_matcher,
-                input_sanitizer=self._input_sanitizer,
-                fetch_urls=settings.engine.fetch_urls_for_analysis,
-            )
+        self._context_analyzer = ContextAnalyzer(
+            max_history=settings.engine.max_history_length
+        )
 
-        if _HAS_CONTEXT:
-            self._context_analyzer = _ContextAnalyzer(
-                max_history=settings.engine.max_history_length
-            )
-
-        if _HAS_SEMANTIC:
-            self._semantic_analyzer = _SemanticAnalyzer(
-                enabled=settings.engine.enable_semantic_analysis
-            )
+        self._semantic_analyzer = SemanticAnalyzer(
+            enabled=settings.engine.enable_semantic_analysis
+        )
 
         self._threshold = settings.engine.pattern_threshold
         self._block = settings.engine.block_on_detection
         self._context_enabled = settings.engine.enable_context_analysis
         self._indirect_enabled = settings.engine.enable_indirect_injection_detection
 
-        pro_active = _HAS_SANITIZER or _HAS_CONTEXT or _HAS_SEMANTIC or _HAS_INDIRECT
         logger.info(
             "EntropyEngine initialized",
             patterns=self.pattern_matcher.get_pattern_count(),
-            tier="pro" if pro_active else "community",
-            context=_HAS_CONTEXT,
-            semantic=_HAS_SEMANTIC,
-            sanitizer=_HAS_SANITIZER,
-            indirect_injection=_HAS_INDIRECT,
+            context=self._context_enabled,
+            semantic=settings.engine.enable_semantic_analysis,
+            sanitizer=settings.engine.enable_recursive_decoding,
+            indirect_injection=self._indirect_enabled,
         )
 
     # ---- Public API --------------------------------------------------------

@@ -32,15 +32,9 @@ def scan(
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Scan text for prompt injection and other attacks."""
+    from entropy.core.context_analyzer import ContextAnalyzer  # noqa: PLC0415
     from entropy.core.output_filter import OutputFilter  # noqa: PLC0415
     from entropy.core.pattern_matcher import PatternMatcher  # noqa: PLC0415
-
-    try:
-        from entropy_pro.core.context_analyzer import (  # noqa: PLC0415
-            context_analyzer,
-        )
-    except ImportError:
-        context_analyzer = None
 
     rprint("[bold cyan]🔍 Scanning text...[/bold cyan]")
 
@@ -48,12 +42,10 @@ def scan(
     matcher = PatternMatcher()
     is_malicious, confidence, detections, max_level = matcher.analyze(text)
 
-    # 2. Context Analysis (Single turn context) - Pro only
     ctx_conf = 0.0
     ctx_issues: list[str] = []
-    if context_analyzer is not None:
-        analyzer = context_analyzer()
-        ctx_conf, ctx_issues = analyzer.analyze(text, [{"role": "user", "content": text}])
+    analyzer = ContextAnalyzer()
+    ctx_conf, ctx_issues = analyzer.analyze(text, [{"role": "user", "content": text}])
 
     if is_malicious or ctx_issues:
         rprint("\n[bold red]⚠  THREAT DETECTED[/bold red]")
