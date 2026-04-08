@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from entropy.api.dependencies import get_engine, require_auth
-from entropy.core.rag_scanner import DocumentChunk, RAGScanner, RAGScanResult
+from entropy.rag.rag_scanner import DocumentChunk, RAGScanner, RAGScanResult
 
 logger = structlog.get_logger(__name__)
 

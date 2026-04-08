@@ -52,9 +52,9 @@ def _rules_to_guardrails_yaml(rules: list[dict[str, Any]], source: str) -> str:
 
         lines += [
             f"  - name: {rule['rule_id']}",
-            f"    description: \"{rule['description']}\"",
+            f'    description: "{rule["description"]}"',
             f"    regulation: {rule.get('regulation', 'UNKNOWN')}",
-            f"    category: \"{rule.get('category', 'General')}\"",
+            f'    category: "{rule.get("category", "General")}"',
             f"    action: {action}",
             f"    confidence: {confidence}",
             f"    severity: {sev}",

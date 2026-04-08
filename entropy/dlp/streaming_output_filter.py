@@ -119,11 +119,13 @@ class StreamingOutputFilter:
         # Flush remaining buffer
         if self.buffer:
             final = self._redact(self.buffer)
-            self.total_detections.extend([
-                {"rule": r.name, "category": r.category}
-                for r in self.rules
-                if r.pattern.search(self.buffer)
-            ])
+            self.total_detections.extend(
+                [
+                    {"rule": r.name, "category": r.category}
+                    for r in self.rules
+                    if r.pattern.search(self.buffer)
+                ]
+            )
             yield final
 
     def process_chunk(self, chunk: str) -> StreamingFilterResult:
@@ -146,11 +148,13 @@ class StreamingOutputFilter:
             for rule in self.rules:
                 matches = list(rule.pattern.finditer(safe_content))
                 if matches:
-                    detections.append({
-                        "rule": rule.name,
-                        "category": rule.category,
-                        "count": len(matches),
-                    })
+                    detections.append(
+                        {
+                            "rule": rule.name,
+                            "category": rule.category,
+                            "count": len(matches),
+                        }
+                    )
 
         was_redacted = bool(detections)
         if was_redacted:
@@ -188,8 +192,8 @@ class StreamingOutputFilter:
         if not potential_matches:
             # No matches found - can release most of the buffer
             # But keep window_size for boundary detection
-            safe = self.buffer[:-self.window_size]
-            hold = self.buffer[-self.window_size:]
+            safe = self.buffer[: -self.window_size]
+            hold = self.buffer[-self.window_size :]
             return safe, hold
 
         # Find the earliest match position
@@ -207,7 +211,8 @@ class StreamingOutputFilter:
 
         # Find complete matches (those that don't touch the end of buffer)
         complete_matches = [
-            (s, e, r) for s, e, r in match_positions
+            (s, e, r)
+            for s, e, r in match_positions
             if e <= len(self.buffer) - self.window_size // 2
         ]
 
@@ -267,10 +272,9 @@ class StreamingOutputFilter:
         return {
             "total_detections": len(self.total_detections),
             "total_redactions": self.total_redactions,
-            "categories_detected": list({
-                d.get("category", "unknown")
-                for d in self.total_detections
-            }),
+            "categories_detected": list(
+                {d.get("category", "unknown") for d in self.total_detections}
+            ),
         }
 
     def reset(self) -> None:

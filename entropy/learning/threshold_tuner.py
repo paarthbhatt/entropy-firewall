@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from entropy.services.learning.feedback_store import FeedbackStore
+    from entropy.learning.feedback_store import FeedbackStore
 
 import structlog
 

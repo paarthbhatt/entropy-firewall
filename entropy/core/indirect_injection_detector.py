@@ -69,6 +69,7 @@ _URL_RE = re.compile(
 # IndirectInjectionDetector
 # ---------------------------------------------------------------------------
 
+
 class IndirectInjectionDetector:
     """Detect prompt injection vectors hidden in non-user content.
 
@@ -192,20 +193,21 @@ class IndirectInjectionDetector:
         analysis_text = sanitized.decoded
 
         if sanitized.was_obfuscated:
-            threats.append(ThreatInfo(
-                category="indirect_injection",
-                name="obfuscated_tool_output",
-                threat_level=ThreatLevel.HIGH,
-                confidence=min(0.4 * sanitized.layers_decoded, 0.95),
-                details=(
-                    f"Obfuscated content in {source}: "
-                    f"{', '.join(sanitized.encodings_found)}"
-                ),
-            ))
+            threats.append(
+                ThreatInfo(
+                    category="indirect_injection",
+                    name="obfuscated_tool_output",
+                    threat_level=ThreatLevel.HIGH,
+                    confidence=min(0.4 * sanitized.layers_decoded, 0.95),
+                    details=(
+                        f"Obfuscated content in {source}: {', '.join(sanitized.encodings_found)}"
+                    ),
+                )
+            )
 
         # Pattern matching on decoded content
-        is_malicious, confidence, detections, threat_level = (
-            self.pattern_matcher.analyze(analysis_text)
+        is_malicious, confidence, detections, threat_level = self.pattern_matcher.analyze(
+            analysis_text
         )
 
         if is_malicious:
@@ -214,16 +216,18 @@ class IndirectInjectionDetector:
             if threat_level == ThreatLevel.CRITICAL:
                 boosted_level = ThreatLevel.CRITICAL
 
-            threats.append(ThreatInfo(
-                category="indirect_injection",
-                name="injection_in_external_content",
-                threat_level=boosted_level,
-                confidence=min(confidence + 0.15, 1.0),
-                details=(
-                    f"Injection pattern found in {source}: "
-                    f"{', '.join(d.pattern_name for d in detections[:3])}"
-                ),
-            ))
+            threats.append(
+                ThreatInfo(
+                    category="indirect_injection",
+                    name="injection_in_external_content",
+                    threat_level=boosted_level,
+                    confidence=min(confidence + 0.15, 1.0),
+                    details=(
+                        f"Injection pattern found in {source}: "
+                        f"{', '.join(d.pattern_name for d in detections[:3])}"
+                    ),
+                )
+            )
 
         return threats
 
@@ -238,56 +242,62 @@ class IndirectInjectionDetector:
                 # Check if the comment contains injection patterns
                 is_mal, conf, _, _ = self.pattern_matcher.analyze(comment_text)
                 if is_mal:
-                    threats.append(ThreatInfo(
-                        category="indirect_injection",
-                        name="hidden_html_comment",
-                        threat_level=ThreatLevel.HIGH,
-                        confidence=min(conf + 0.1, 1.0),
-                        details=(
-                            f"Malicious instructions hidden in HTML comment in {source}"
-                        ),
-                    ))
+                    threats.append(
+                        ThreatInfo(
+                            category="indirect_injection",
+                            name="hidden_html_comment",
+                            threat_level=ThreatLevel.HIGH,
+                            confidence=min(conf + 0.1, 1.0),
+                            details=(f"Malicious instructions hidden in HTML comment in {source}"),
+                        )
+                    )
 
         # Invisible Unicode characters hiding instructions
         invisible_matches = _INVISIBLE_UNICODE_RE.findall(content)
         if invisible_matches:
             total_invisible = sum(len(m) for m in invisible_matches)
             if total_invisible > 5:
-                threats.append(ThreatInfo(
-                    category="indirect_injection",
-                    name="invisible_unicode_chars",
-                    threat_level=ThreatLevel.MEDIUM,
-                    confidence=min(0.2 * total_invisible, 0.85),
-                    details=(
-                        f"{total_invisible} invisible Unicode characters found in {source}"
-                    ),
-                ))
+                threats.append(
+                    ThreatInfo(
+                        category="indirect_injection",
+                        name="invisible_unicode_chars",
+                        threat_level=ThreatLevel.MEDIUM,
+                        confidence=min(0.2 * total_invisible, 0.85),
+                        details=(
+                            f"{total_invisible} invisible Unicode characters found in {source}"
+                        ),
+                    )
+                )
 
         # Instruction prefixes in non-user content  (e.g. "System: do X")
         if "tool" in source or "function" in source:
             prefix_matches = _INSTRUCTION_PREFIX_RE.findall(content)
             if prefix_matches:
-                threats.append(ThreatInfo(
-                    category="indirect_injection",
-                    name="instruction_prefix_in_tool_output",
-                    threat_level=ThreatLevel.HIGH,
-                    confidence=0.8,
-                    details=(
-                        f"Instruction prefix pattern found in {source} ΓÇö "
-                        f"possible attempt to override system instructions"
-                    ),
-                ))
+                threats.append(
+                    ThreatInfo(
+                        category="indirect_injection",
+                        name="instruction_prefix_in_tool_output",
+                        threat_level=ThreatLevel.HIGH,
+                        confidence=0.8,
+                        details=(
+                            f"Instruction prefix pattern found in {source} ΓÇö "
+                            f"possible attempt to override system instructions"
+                        ),
+                    )
+                )
 
         # Markdown injection patterns
         md_matches = _MD_INJECTION_RE.findall(content)
         if md_matches:
-            threats.append(ThreatInfo(
-                category="indirect_injection",
-                name="markdown_injection",
-                threat_level=ThreatLevel.MEDIUM,
-                confidence=0.7,
-                details=f"Markdown injection pattern found in {source}",
-            ))
+            threats.append(
+                ThreatInfo(
+                    category="indirect_injection",
+                    name="markdown_injection",
+                    threat_level=ThreatLevel.MEDIUM,
+                    confidence=0.7,
+                    details=f"Markdown injection pattern found in {source}",
+                )
+            )
 
         return threats
 

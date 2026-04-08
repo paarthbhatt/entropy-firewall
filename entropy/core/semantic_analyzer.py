@@ -84,6 +84,7 @@ class SemanticResult:
 # Lightweight built-in heuristic classifier (no model needed)
 # ---------------------------------------------------------------------------
 
+
 class _BuiltinClassifier:
     """Fast keyword/heuristic classifier as a fallback when no ONNX model
     is available.  This is significantly better than the original no-op stub
@@ -92,32 +93,73 @@ class _BuiltinClassifier:
 
     # Weighted keyword groups with associated labels
     _SIGNALS: list[tuple[str, list[str], float]] = [  # noqa: RUF012
-        ("injection", [
-            "ignore previous", "ignore all", "ignore above",
-            "disregard instructions", "new instructions",
-            "override system", "forget everything",
-            "do not follow", "system prompt",
-            "actual instructions", "real instructions",
-        ], 0.78),
-        ("jailbreak", [
-            "DAN", "do anything now", "jailbreak", "developer mode",
-            "no restrictions", "unfiltered", "bypass safety",
-            "act as an unrestricted", "pretend you have no",
-            "opposite day", "hypothetical scenario where you",
-            "evil mode", "uncensored",
-        ], 0.82),
-        ("exfiltration", [
-            "reveal your prompt", "show me your instructions",
-            "what are your rules", "system message",
-            "repeat the above", "output initialization",
-            "training data", "memorized", "extract",
-            "give me all API keys", "credentials",
-        ], 0.75),
-        ("obfuscation", [
-            "base64", "encode", "rot13", "hex",
-            "translate to", "in reverse",
-            "character by character", "spell out",
-        ], 0.60),
+        (
+            "injection",
+            [
+                "ignore previous",
+                "ignore all",
+                "ignore above",
+                "disregard instructions",
+                "new instructions",
+                "override system",
+                "forget everything",
+                "do not follow",
+                "system prompt",
+                "actual instructions",
+                "real instructions",
+            ],
+            0.78,
+        ),
+        (
+            "jailbreak",
+            [
+                "DAN",
+                "do anything now",
+                "jailbreak",
+                "developer mode",
+                "no restrictions",
+                "unfiltered",
+                "bypass safety",
+                "act as an unrestricted",
+                "pretend you have no",
+                "opposite day",
+                "hypothetical scenario where you",
+                "evil mode",
+                "uncensored",
+            ],
+            0.82,
+        ),
+        (
+            "exfiltration",
+            [
+                "reveal your prompt",
+                "show me your instructions",
+                "what are your rules",
+                "system message",
+                "repeat the above",
+                "output initialization",
+                "training data",
+                "memorized",
+                "extract",
+                "give me all API keys",
+                "credentials",
+            ],
+            0.75,
+        ),
+        (
+            "obfuscation",
+            [
+                "base64",
+                "encode",
+                "rot13",
+                "hex",
+                "translate to",
+                "in reverse",
+                "character by character",
+                "spell out",
+            ],
+            0.60,
+        ),
     ]
 
     def classify(self, text: str) -> tuple[str, float]:
@@ -144,6 +186,7 @@ _builtin_classifier = _BuiltinClassifier()
 # ---------------------------------------------------------------------------
 # SemanticAnalyzer
 # ---------------------------------------------------------------------------
+
 
 class SemanticAnalyzer:
     """Local Intelligence Layer for LLM security analysis.
@@ -191,9 +234,7 @@ class SemanticAnalyzer:
                 expected_path=str(resolved_path),
             )
         else:
-            logger.info(
-                "SemanticAnalyzer: onnxruntime not installed, using built-in classifier"
-            )
+            logger.info("SemanticAnalyzer: onnxruntime not installed, using built-in classifier")
 
         # Try loading HuggingFace tokenizer (for ONNX mode)
         if self._use_onnx and _TOKENIZER_AVAILABLE:
@@ -304,8 +345,7 @@ class SemanticAnalyzer:
                     threat_level=ThreatLevel.LOW,
                     confidence=confidence,
                     reasoning=(
-                        f"Heuristic classifier: {label} ({confidence:.1%}) "
-                        f"— below threshold"
+                        f"Heuristic classifier: {label} ({confidence:.1%}) — below threshold"
                     ),
                     label=label,
                 )

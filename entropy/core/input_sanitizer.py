@@ -34,6 +34,7 @@ logger = structlog.get_logger(__name__)
 # Data classes
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SanitizedInput:
     """Result of recursive sanitisation."""
@@ -53,9 +54,20 @@ class SanitizedInput:
 # ---------------------------------------------------------------------------
 
 _LEET_MAP: dict[str, str] = {
-    "0": "o", "1": "i", "3": "e", "4": "a", "5": "s",
-    "7": "t", "8": "b", "@": "a", "$": "s", "!": "i",
-    "|": "i", "(": "c", "+": "t", "}{": "h",
+    "0": "o",
+    "1": "i",
+    "3": "e",
+    "4": "a",
+    "5": "s",
+    "7": "t",
+    "8": "b",
+    "@": "a",
+    "$": "s",
+    "!": "i",
+    "|": "i",
+    "(": "c",
+    "+": "t",
+    "}{": "h",
 }
 
 _LEET_PATTERN = re.compile("|".join(re.escape(k) for k in _LEET_MAP), re.IGNORECASE)
@@ -64,6 +76,7 @@ _LEET_PATTERN = re.compile("|".join(re.escape(k) for k in _LEET_MAP), re.IGNOREC
 # ---------------------------------------------------------------------------
 # InputSanitizer
 # ---------------------------------------------------------------------------
+
 
 class InputSanitizer:
     """Recursively decode obfuscated inputs to expose hidden payloads.
@@ -217,6 +230,7 @@ class InputSanitizer:
     @staticmethod
     def _decode_hex_escapes(text: str) -> str:
         r"""Decode ``\x41`` style hex escapes."""
+
         def _replacer(m: re.Match) -> str:
             try:
                 return chr(int(m.group(1), 16))
@@ -237,16 +251,21 @@ class InputSanitizer:
 
         # Check if rotation reveals dangerous keywords that weren't there before
         danger_words = [
-            "ignore", "system", "prompt", "instruction", "bypass",
-            "override", "jailbreak", "admin", "execute", "eval",
+            "ignore",
+            "system",
+            "prompt",
+            "instruction",
+            "bypass",
+            "override",
+            "jailbreak",
+            "admin",
+            "execute",
+            "eval",
         ]
         original_lower = text.lower()
         rotated_lower = rotated.lower()
 
-        new_matches = sum(
-            1 for w in danger_words
-            if w in rotated_lower and w not in original_lower
-        )
+        new_matches = sum(1 for w in danger_words if w in rotated_lower and w not in original_lower)
 
         return rotated if new_matches >= 2 else None
 

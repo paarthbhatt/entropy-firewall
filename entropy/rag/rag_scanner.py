@@ -129,36 +129,38 @@ class RAGScanner:
                 size=len(chunk.content),
                 max_size=self.max_chunk_size,
             )
-            content = chunk.content[:self.max_chunk_size]
+            content = chunk.content[: self.max_chunk_size]
         else:
             content = chunk.content
 
         threats: list[ThreatInfo] = []
 
         # Quick pattern scan first
-        is_malicious, confidence, detections, _threat_level = self.pattern_matcher.analyze(
-            content
-        )
+        is_malicious, confidence, detections, _threat_level = self.pattern_matcher.analyze(content)
 
         for d in detections:
-            threats.append(ThreatInfo(
-                category=d.pattern_category,
-                name=d.pattern_name,
-                threat_level=d.threat_level,
-                confidence=d.confidence,
-                details=d.details,
-            ))
+            threats.append(
+                ThreatInfo(
+                    category=d.pattern_category,
+                    name=d.pattern_name,
+                    threat_level=d.threat_level,
+                    confidence=d.confidence,
+                    details=d.details,
+                )
+            )
 
         # Decode any obfuscation
         sanitized_input = self.input_sanitizer.sanitize(content)
         if sanitized_input.was_obfuscated:
-            threats.append(ThreatInfo(
-                category="obfuscation",
-                name="encoded_content_in_chunk",
-                threat_level=ThreatLevel.MEDIUM,
-                confidence=min(0.3 * sanitized_input.layers_decoded, 0.9),
-                details=f"Decoded {sanitized_input.layers_decoded} encoding layer(s)",
-            ))
+            threats.append(
+                ThreatInfo(
+                    category="obfuscation",
+                    name="encoded_content_in_chunk",
+                    threat_level=ThreatLevel.MEDIUM,
+                    confidence=min(0.3 * sanitized_input.layers_decoded, 0.9),
+                    details=f"Decoded {sanitized_input.layers_decoded} encoding layer(s)",
+                )
+            )
             # Re-scan decoded content
             content = sanitized_input.decoded
 

@@ -164,13 +164,9 @@ class EntropyEngine:
             fetch_urls=settings.engine.fetch_urls_for_analysis,
         )
 
-        self._context_analyzer = ContextAnalyzer(
-            max_history=settings.engine.max_history_length
-        )
+        self._context_analyzer = ContextAnalyzer(max_history=settings.engine.max_history_length)
 
-        self._semantic_analyzer = SemanticAnalyzer(
-            enabled=settings.engine.enable_semantic_analysis
-        )
+        self._semantic_analyzer = SemanticAnalyzer(enabled=settings.engine.enable_semantic_analysis)
 
         self._threshold = settings.engine.pattern_threshold
         self._block = settings.engine.block_on_detection

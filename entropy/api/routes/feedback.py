@@ -15,8 +15,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from entropy.api.dependencies import require_auth
-from entropy.services.learning.feedback_store import FeedbackRecord, FeedbackStore
-from entropy.services.learning.threshold_tuner import ThresholdTuner
+from entropy.learning.feedback_store import FeedbackRecord, FeedbackStore
+from entropy.learning.threshold_tuner import ThresholdTuner
 
 logger = structlog.get_logger(__name__)
 

@@ -27,9 +27,22 @@ class ContextAnalyzer:
 
     # Words that hint at escalation when frequency suddenly increases
     _ESCALATION_MARKERS: set = {  # noqa: RUF012
-        "ignore", "bypass", "override", "hack", "exploit", "jailbreak",
-        "unrestricted", "unfiltered", "secret", "hidden", "admin",
-        "password", "credentials", "system", "prompt", "pretend",
+        "ignore",
+        "bypass",
+        "override",
+        "hack",
+        "exploit",
+        "jailbreak",
+        "unrestricted",
+        "unfiltered",
+        "secret",
+        "hidden",
+        "admin",
+        "password",
+        "credentials",
+        "system",
+        "prompt",
+        "pretend",
     }
 
     # Probing phrases
@@ -42,9 +55,7 @@ class ContextAnalyzer:
 
     def __init__(self, max_history: int = 10) -> None:
         self.max_history = max_history
-        self._probing_compiled = [
-            re.compile(p, re.IGNORECASE) for p in self._PROBING_PHRASES
-        ]
+        self._probing_compiled = [re.compile(p, re.IGNORECASE) for p in self._PROBING_PHRASES]
 
     def analyze(
         self,
@@ -72,19 +83,23 @@ class ContextAnalyzer:
             scores.append(topic_score)
 
         # 2. Probing behaviour
-        probe_score = self._detect_probing([
-            *history,
-            {"role": "user", "content": current_input},
-        ])
+        probe_score = self._detect_probing(
+            [
+                *history,
+                {"role": "user", "content": current_input},
+            ]
+        )
         if probe_score > 0.4:
             issues.append(f"Probing behaviour detected (score={probe_score:.2f})")
             scores.append(probe_score)
 
         # 3. Escalation detection
-        esc_score = self._detect_escalation([
-            *history,
-            {"role": "user", "content": current_input},
-        ])
+        esc_score = self._detect_escalation(
+            [
+                *history,
+                {"role": "user", "content": current_input},
+            ]
+        )
         if esc_score > 0.4:
             issues.append(f"Escalation pattern detected (score={esc_score:.2f})")
             scores.append(esc_score)
@@ -100,12 +115,11 @@ class ContextAnalyzer:
 
     # ---- Heuristic detectors -----------------------------------------------
 
-    def _detect_topic_change(
-        self, current_input: str, history: list[dict[str, Any]]
-    ) -> float:
+    def _detect_topic_change(self, current_input: str, history: list[dict[str, Any]]) -> float:
         """Detect sudden topic change via keyword overlap analysis."""
         user_messages = [
-            m.get("content", "") for m in history
+            m.get("content", "")
+            for m in history
             if m.get("role") == "user" and isinstance(m.get("content"), str)
         ]
         if not user_messages:
@@ -132,7 +146,8 @@ class ContextAnalyzer:
     def _detect_probing(self, messages: list[dict[str, Any]]) -> float:
         """Detect boundary-probing questions."""
         user_texts = [
-            m.get("content", "") for m in messages
+            m.get("content", "")
+            for m in messages
             if m.get("role") == "user" and isinstance(m.get("content"), str)
         ]
         probe_count = 0
@@ -154,7 +169,8 @@ class ContextAnalyzer:
     def _detect_escalation(self, messages: list[dict[str, Any]]) -> float:
         """Detect gradual escalation via marker frequency increase."""
         user_texts = [
-            m.get("content", "") for m in messages
+            m.get("content", "")
+            for m in messages
             if m.get("role") == "user" and isinstance(m.get("content"), str)
         ]
         if len(user_texts) < 3:
@@ -173,12 +189,11 @@ class ContextAnalyzer:
             return 0.7
         return 0.0
 
-    def _detect_retries(
-        self, current_input: str, history: list[dict[str, Any]]
-    ) -> float:
+    def _detect_retries(self, current_input: str, history: list[dict[str, Any]]) -> float:
         """Detect repeated attempts with slight variations (retry attack)."""
         user_texts = [
-            m.get("content", "") for m in history
+            m.get("content", "")
+            for m in history
             if m.get("role") == "user" and isinstance(m.get("content"), str)
         ]
         if not user_texts:

@@ -230,7 +230,7 @@ async def submit_override(
         feedback_store = getattr(request.app.state, "feedback_store", None)
         if feedback_store:
             try:
-                from entropy.services.learning.feedback_store import FeedbackRecord  # noqa: PLC0415
+                from entropy.learning.feedback_store import FeedbackRecord  # noqa: PLC0415
 
                 record = FeedbackRecord(
                     request_log_id=body.request_log_id,
@@ -287,8 +287,8 @@ async def generate_guardrails(
 
     # Get the policy parser (requires provider registry)
     try:
+        from entropy.compliance.policy_parser import PolicyParser  # noqa: PLC0415
         from entropy.providers.registry import get_registry  # noqa: PLC0415
-        from entropy.services.compliance.policy_parser import PolicyParser  # noqa: PLC0415
 
         parser = PolicyParser(get_registry())
         rules, yaml_output = await parser.generate_guardrails_yaml(
