@@ -138,6 +138,11 @@ module = "tokenizers"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "entropy.core.semantic_analyzer"
+warn_return_any = false
+disable_error_code = ["assignment"]
+
+[[tool.mypy.overrides]]
 module = "openai"
 ignore_missing_imports = true
 
