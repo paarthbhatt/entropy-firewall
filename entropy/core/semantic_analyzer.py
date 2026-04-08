@@ -30,22 +30,25 @@ logger = structlog.get_logger(__name__)
 
 # Try to import optional ML dependencies
 _ML_AVAILABLE = False
+np: Any
+ort: Any
 try:
-    import numpy as np
-    import onnxruntime as ort
+    import numpy as np  # type: ignore[no-redef]
+    import onnxruntime as ort  # type: ignore[no-redef]
 
     _ML_AVAILABLE = True
 except ImportError:
     np = None
     ort = None
 
+_TOKENIZER_AVAILABLE = False
+HFTokenizer: Any
 try:
-    from tokenizers import Tokenizer as HFTokenizer
+    from tokenizers import Tokenizer as HFTokenizer  # type: ignore[no-redef]
 
     _TOKENIZER_AVAILABLE = True
 except ImportError:
     HFTokenizer = None
-    _TOKENIZER_AVAILABLE = False
 
 
 # ---------------------------------------------------------------------------
