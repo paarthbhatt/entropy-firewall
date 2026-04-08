@@ -104,7 +104,7 @@ class FeedbackStore:
                 correct=feedback.was_correct,
             )
 
-            return result
+            return int(result)
 
     async def get_pattern_stats(self, pattern_name: str) -> PatternStats | None:
         """Get statistics for a specific pattern.
@@ -233,7 +233,8 @@ class FeedbackStore:
         query = "SELECT COUNT(*) FROM feedback"
 
         async with self.pool.acquire() as conn:
-            return await conn.fetchval(query)
+            result = await conn.fetchval(query)
+            return int(result) if result is not None else 0
 
     async def mark_reviewed(
         self,

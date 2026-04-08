@@ -125,7 +125,7 @@ class ContextAnalyzer:
         if not user_messages:
             return 0.0
 
-        prev_words = set()
+        prev_words: set[str] = set()
         for msg in user_messages[-3:]:
             prev_words.update(w.lower() for w in re.findall(r"\w{3,}", msg))
 

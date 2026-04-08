@@ -231,11 +231,11 @@ class InputSanitizer:
     def _decode_hex_escapes(text: str) -> str:
         r"""Decode ``\x41`` style hex escapes."""
 
-        def _replacer(m: re.Match) -> str:
+        def _replacer(m: re.Match[str]) -> str:
             try:
                 return chr(int(m.group(1), 16))
             except (ValueError, OverflowError):
-                return m.group(0)
+                return str(m.group(0))
 
         return re.sub(r"\\x([0-9a-fA-F]{2})", _replacer, text)
 
@@ -275,8 +275,8 @@ class InputSanitizer:
         if not _LEET_PATTERN.search(text):
             return text
 
-        def _replace(m: re.Match) -> str:
-            return _LEET_MAP.get(m.group(0).lower(), m.group(0))
+        def _replace(m: re.Match[str]) -> str:
+            return str(_LEET_MAP.get(m.group(0).lower(), m.group(0)))
 
         return _LEET_PATTERN.sub(_replace, text)
 

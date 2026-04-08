@@ -166,11 +166,19 @@ class RAGScanner:
 
         # Full analysis if requested or if quick scan found issues
         if detailed or is_malicious:
-            from entropy.models.schemas import ChatCompletionRequest  # noqa: PLC0415
+            from entropy.models.schemas import (  # noqa: PLC0415
+                ChatCompletionRequest,
+                ChatMessage,
+            )
 
             fake_request = ChatCompletionRequest(
                 model="rag-scan",
-                messages=[{"role": "user", "content": content}],
+                messages=[ChatMessage(role="user", content=content)],
+                temperature=0.7,
+                top_p=1.0,
+                max_tokens=1000,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
             )
             verdict = await self.engine.analyze_request(fake_request)
 

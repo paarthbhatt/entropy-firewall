@@ -320,7 +320,7 @@ class IndirectInjectionDetector:
             with urllib.request.urlopen(req, timeout=3) as resp:
                 # Max 100KB to prevent resource abuse
                 data = resp.read(102_400)
-                return data.decode("utf-8", errors="replace")
+                return str(data.decode("utf-8", errors="replace"))
         except Exception as e:
             logger.debug("Failed to fetch URL for analysis", url=url, error=str(e))
             return None

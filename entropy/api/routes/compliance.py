@@ -67,12 +67,12 @@ class GuardrailsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _get_db(request: Request):
+def _get_db(request: Request) -> Any:
     pool = getattr(request.app.state, "db_pool", None)
     if pool is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available ΓÇö compliance features require PostgreSQL.",
+            detail="Database not available — compliance features require PostgreSQL.",
         )
     return pool
 
@@ -95,8 +95,8 @@ async def list_violations(
     request: Request,
     limit: int = 50,
     threat_level: str | None = None,
-    _auth=Depends(require_auth),  # noqa: B008
-):
+    _auth: dict[str, Any] = Depends(require_auth),  # noqa: B008
+) -> list[ViolationRecord]:
     pool = _get_db(request)
 
     query = """
@@ -155,8 +155,8 @@ async def list_violations(
 )
 async def get_compliance_stats(
     request: Request,
-    _auth=Depends(require_auth),  # noqa: B008
-):
+    _auth: dict[str, Any] = Depends(require_auth),  # noqa: B008
+) -> ComplianceStats:
     pool = _get_db(request)
 
     async with pool.acquire() as conn:
@@ -207,8 +207,8 @@ async def get_compliance_stats(
 async def submit_override(
     body: OverrideRequest,
     request: Request,
-    _auth=Depends(require_auth),  # noqa: B008
-):
+    _auth: dict[str, Any] = Depends(require_auth),  # noqa: B008
+) -> None:
     pool = _get_db(request)
 
     async with pool.acquire() as conn:
@@ -233,10 +233,11 @@ async def submit_override(
                 from entropy.learning.feedback_store import FeedbackRecord  # noqa: PLC0415
 
                 record = FeedbackRecord(
-                    request_log_id=body.request_log_id,
-                    feedback_type="false_positive",
+                    request_log_id=int(body.request_log_id)
+                    if body.request_log_id.isdigit()
+                    else None,
                     was_correct=False,
-                    comment=f"Compliance override: {body.reason}",
+                    reason=f"Compliance override: {body.reason}",
                 )
                 await feedback_store.save(record)
                 logger.info(
@@ -267,8 +268,8 @@ async def generate_guardrails(
     request: Request,
     file: UploadFile = File(..., description="Policy PDF (max 50MB)"),  # noqa: B008
     model: str = Form(default="gpt-4o-mini"),
-    _auth=Depends(require_auth),  # noqa: B008
-):
+    _auth: dict[str, Any] = Depends(require_auth),  # noqa: B008
+) -> GuardrailsResponse:
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -315,7 +316,7 @@ def _extract_pdf_text(pdf_bytes: bytes) -> str:
     try:
         import io as _io  # noqa: PLC0415
 
-        from pypdf import PdfReader  # type: ignore  # noqa: PLC0415
+        from pypdf import PdfReader  # type: ignore[import-not-found]  # noqa: PLC0415
 
         reader = PdfReader(_io.BytesIO(pdf_bytes))
         pages = [p.extract_text() or "" for p in reader.pages]

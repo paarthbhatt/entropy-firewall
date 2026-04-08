@@ -167,7 +167,9 @@ class PolicyParser:
 def _chunk_text(text: str, max_chars: int) -> list[str]:
     """Split text into chunks of at most `max_chars` characters at paragraph boundaries."""
     paragraphs = text.split("\n\n")
-    chunks, current, current_len = [], [], 0
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
     for para in paragraphs:
         if current_len + len(para) > max_chars and current:
             chunks.append("\n\n".join(current))

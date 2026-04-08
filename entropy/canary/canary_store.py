@@ -102,7 +102,7 @@ class CanaryStore:
         data = await self.redis.get(key)
 
         if data:
-            return json.loads(data)
+            return dict(json.loads(data))
         return None
 
     async def get_by_request(self, request_id: str) -> str | None:
@@ -115,7 +115,8 @@ class CanaryStore:
             Canary token or None
         """
         key = f"{self.REQUEST_PREFIX}{request_id}"
-        return await self.redis.get(key)
+        result = await self.redis.get(key)
+        return str(result) if result is not None else None
 
     async def exists(self, token: str) -> bool:
         """Check if a canary token exists and is valid.
@@ -127,7 +128,8 @@ class CanaryStore:
             True if token exists and hasn't expired
         """
         key = f"{self.TOKEN_PREFIX}{token}"
-        return await self.redis.exists(key) > 0
+        result = await self.redis.exists(key)
+        return bool(result > 0)
 
     async def remove(self, token: str) -> None:
         """Remove a canary token.

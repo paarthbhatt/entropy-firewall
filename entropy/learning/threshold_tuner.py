@@ -306,7 +306,7 @@ class ThresholdTuner:
 
             if result:
                 # Check if within cooldown period
-                return result > datetime.utcnow() - timedelta(days=self.COOLDOWN_DAYS)
+                return bool(result > datetime.utcnow() - timedelta(days=self.COOLDOWN_DAYS))
 
         return False
 
