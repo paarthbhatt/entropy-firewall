@@ -98,10 +98,6 @@ warn_no_return = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-module = "tests.*"
-disallow_untyped_defs = false
-
-[[tool.mypy.overrides]]
 module = "yaml"
 ignore_missing_imports = true
 
@@ -123,6 +119,22 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "httpx"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pypdf"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "numpy"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "onnxruntime"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tokenizers"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

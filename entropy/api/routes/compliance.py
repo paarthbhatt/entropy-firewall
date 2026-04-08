@@ -316,7 +316,7 @@ def _extract_pdf_text(pdf_bytes: bytes) -> str:
     try:
         import io as _io  # noqa: PLC0415
 
-        from pypdf import PdfReader  # type: ignore[import-not-found]  # noqa: PLC0415
+        from pypdf import PdfReader  # noqa: PLC0415
 
         reader = PdfReader(_io.BytesIO(pdf_bytes))
         pages = [p.extract_text() or "" for p in reader.pages]
