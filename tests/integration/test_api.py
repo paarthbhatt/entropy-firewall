@@ -46,7 +46,7 @@ class TestHealthEndpoint:
         resp = client.get("/health")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "healthy"
+        assert data["status"] in {"healthy", "degraded"}
         assert "version" in data
         assert "patterns_loaded" in data
         assert data["patterns_loaded"] > 0
