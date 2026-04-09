@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ---------------------------------------------------------------------------
@@ -199,10 +199,13 @@ class Settings(BaseSettings):
     )
 
     # LLM Provider
-    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    openai_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("OPENAI_API_KEY", "ENTROPY_OPENAI_API_KEY"),
+    )
     openai_base_url: str | None = Field(
         default=None,
-        alias="OPENAI_BASE_URL",
+        validation_alias=AliasChoices("OPENAI_BASE_URL", "ENTROPY_OPENAI_BASE_URL"),
         description="Optional custom base URL for Azure/LocalAI",
     )
 

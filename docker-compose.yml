@@ -51,7 +51,8 @@ services:
       - ENTROPY_DB_PASSWORD=entropy_dev_password
       - ENTROPY_REDIS_URL=redis://redis:6379/0
       - ENTROPY_MASTER_API_KEY=dev-master-key-change-in-production
-      - ENTROPY_OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
     depends_on:
       postgres:
         condition: service_healthy

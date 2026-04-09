@@ -100,7 +100,11 @@ def get_provider() -> Any:
             return _TestingProvider()
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OPENAI_API_KEY is not configured",
+            detail=(
+                "No upstream LLM credentials configured. Set OPENAI_API_KEY "
+                "(or ENTROPY_OPENAI_API_KEY) and optionally OPENAI_BASE_URL "
+                "for OpenAI-compatible local/cloud endpoints."
+            ),
         )
     return OpenAIProvider(
         api_key=settings.openai_api_key,
