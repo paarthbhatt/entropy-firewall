@@ -26,7 +26,7 @@ def pattern_matcher():
 @pytest.fixture
 def context_analyzer():
     """Fresh ContextAnalyzer instance."""
-    from entropy_pro.core.context_analyzer import ContextAnalyzer  # noqa: PLC0415
+    from entropy.core.context_analyzer import ContextAnalyzer  # noqa: PLC0415
 
     return ContextAnalyzer(max_history=10)
 
