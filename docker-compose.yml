@@ -1,5 +1,10 @@
 # =============================================================================
-# Entropy LLM Firewall — Docker Compose (Development)
+# Entropy LLM Firewall — Docker Compose (Development ONLY)
+# -----------------------------------------------------------------------------
+# WARNING: The default credentials below are for LOCAL DEVELOPMENT.
+# Never deploy these to staging/production. Override every secret via a
+# `.env` file or your orchestrator's secret store, e.g.:
+#   POSTGRES_PASSWORD=... ENTROPY_MASTER_API_KEY=... docker compose up
 # =============================================================================
 version: "3.9"
 
@@ -10,7 +15,7 @@ services:
     environment:
       POSTGRES_DB: entropy
       POSTGRES_USER: entropy
-      POSTGRES_PASSWORD: entropy_dev_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-entropy_dev_password}
     ports:
       - "5432:5432"
     volumes:
@@ -48,9 +53,10 @@ services:
       - ENTROPY_DB_PORT=5432
       - ENTROPY_DB_NAME=entropy
       - ENTROPY_DB_USER=entropy
-      - ENTROPY_DB_PASSWORD=entropy_dev_password
+      - ENTROPY_DB_PASSWORD=${POSTGRES_PASSWORD:-entropy_dev_password}
       - ENTROPY_REDIS_URL=redis://redis:6379/0
-      - ENTROPY_MASTER_API_KEY=dev-master-key-change-in-production
+      # Override in production: ENTROPY_MASTER_API_KEY=<strong random value>
+      - ENTROPY_MASTER_API_KEY=${ENTROPY_MASTER_API_KEY:-dev-master-key-change-in-production}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
     depends_on:
