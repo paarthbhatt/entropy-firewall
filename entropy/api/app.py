@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
+from typing import Any, cast
 
 import redis.asyncio as aioredis
 import structlog
@@ -75,7 +76,9 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
             socket_timeout=settings.redis.socket_timeout,
             decode_responses=True,
         )
-        await redis_client.ping()  # type: ignore[misc]
+        # redis-py types ping() differently across versions
+        # (Coroutine vs Awaitable[bool] | bool); normalize via cast.
+        await cast("Any", redis_client.ping())
         app.state.redis = redis_client
         logger.info("Redis connected", url=settings.redis.url)
     except Exception as exc:

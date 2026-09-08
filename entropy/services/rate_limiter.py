@@ -82,7 +82,7 @@ class RateLimiter:
 
     async def reset(self, identifier: str) -> int:
         """Delete all rate-limit keys for *identifier*."""
-        keys: list[bytes] = await self.redis.keys(f"rl:{identifier}:*")
+        keys = await self.redis.keys(f"rl:{identifier}:*")
         if keys:
             deleted: int = await self.redis.delete(*keys)
             logger.info("Rate limit reset", identifier=identifier, deleted=deleted)

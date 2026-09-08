@@ -159,9 +159,9 @@ def test_create_api_key_uses_dotenv_master_key(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("ENTROPY_MASTER_API_KEY", raising=False)
 
     runner = CliRunner()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
-        Path(".env").write_text("ENTROPY_MASTER_API_KEY=ent-from-dotenv\n", encoding="utf-8")
-        result = runner.invoke(app, ["create-api-key", "demo-app"])
+    monkeypatch.chdir(tmp_path)
+    Path(".env").write_text("ENTROPY_MASTER_API_KEY=ent-from-dotenv\n", encoding="utf-8")
+    result = runner.invoke(app, ["create-api-key", "demo-app"])
 
     assert result.exit_code == 0
     assert captured["url"].endswith("/admin/api-keys")
@@ -196,12 +196,12 @@ def test_create_api_key_explicit_master_key_overrides_other_sources_and_prints_h
     monkeypatch.setenv("ENTROPY_MASTER_API_KEY", "ent-from-env")
 
     runner = CliRunner()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
-        Path(".env").write_text("ENTROPY_MASTER_API_KEY=ent-from-dotenv\n", encoding="utf-8")
-        result = runner.invoke(
-            app,
-            ["create-api-key", "demo-app", "--master-key", "ent-explicit"],
-        )
+    monkeypatch.chdir(tmp_path)
+    Path(".env").write_text("ENTROPY_MASTER_API_KEY=ent-from-dotenv\n", encoding="utf-8")
+    result = runner.invoke(
+        app,
+        ["create-api-key", "demo-app", "--master-key", "ent-explicit"],
+    )
 
     assert result.exit_code == 0
     assert captured["url"].endswith("/admin/api-keys")
@@ -249,9 +249,9 @@ def test_smoke_uses_dotenv_master_key(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("ENTROPY_MASTER_API_KEY", raising=False)
 
     runner = CliRunner()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
-        Path(".env").write_text("ENTROPY_MASTER_API_KEY=ent-smoke-master\n", encoding="utf-8")
-        result = runner.invoke(app, ["smoke"])
+    monkeypatch.chdir(tmp_path)
+    Path(".env").write_text("ENTROPY_MASTER_API_KEY=ent-smoke-master\n", encoding="utf-8")
+    result = runner.invoke(app, ["smoke"])
 
     assert result.exit_code == 0
     assert captured["master"] == "ent-smoke-master"

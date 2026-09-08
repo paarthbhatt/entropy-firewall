@@ -40,12 +40,14 @@ except ImportError:
     ort = None
 
 _TOKENIZER_AVAILABLE = False
+HFTokenizer: Any = None
 try:
-    from tokenizers import Tokenizer as HFTokenizer
+    from tokenizers import Tokenizer
 
+    HFTokenizer = Tokenizer
     _TOKENIZER_AVAILABLE = True
 except ImportError:
-    HFTokenizer = None
+    pass
 
 
 # ---------------------------------------------------------------------------
