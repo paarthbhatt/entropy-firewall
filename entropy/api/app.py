@@ -5,6 +5,7 @@ Wires up all routes, middleware, lifespan events, and error handlers.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
 
@@ -18,8 +19,36 @@ from entropy.api.middleware import RequestLoggingMiddleware, TimingMiddleware
 from entropy.api.routes import admin, chat, health
 from entropy.config import get_settings
 from entropy.db.connection import close_pool, get_pool, init_database
+from entropy.db.repository import RequestLogRepository
+from entropy.providers.registry import get_registry
 
 logger = structlog.get_logger(__name__)
+
+_RETENTION_INTERVAL_SECONDS = 24 * 60 * 60  # daily purge
+
+
+async def _retention_loop() -> None:
+    """Periodically purge request logs older than the retention window."""
+    settings = get_settings()
+    retention_days = settings.db.log_retention_days
+    if retention_days <= 0:
+        logger.info("Request log retention purge disabled")
+        return
+    while True:
+        try:
+            await asyncio.sleep(_RETENTION_INTERVAL_SECONDS)
+            pool = await get_pool()
+            deleted = await RequestLogRepository(pool).delete_old_logs(days=retention_days)
+            if deleted:
+                logger.info(
+                    "Purged old request logs",
+                    deleted=deleted,
+                    retention_days=retention_days,
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.error("Request log retention purge failed", error=str(exc))
 
 
 # ---------------------------------------------------------------------------
@@ -61,11 +90,14 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         app.state.db_pool = await get_pool()
         await init_database()
         logger.info("Database connected and migrated")
+        # Retention: keep the audit table bounded with a daily purge task
+        app.state.retention_task = asyncio.create_task(_retention_loop())
     except Exception as exc:
         logger.error("Database connection failed — audit logging disabled", error=str(exc))
         if settings.environment == "production" and settings.enforce_dependencies:
             raise RuntimeError("Database connection failed in production") from exc
         app.state.db_pool = None
+        app.state.retention_task = None
 
     # Configure structlog
     log_level = getattr(logging, settings.logging.level.upper(), logging.INFO)
@@ -85,8 +117,24 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     # -- Shutdown --
     logger.info("Shutting down Entropy")
 
+    retention_task = getattr(app.state, "retention_task", None)
+    if retention_task is not None:
+        retention_task.cancel()
+        with suppress(asyncio.CancelledError, Exception):
+            await retention_task
+
+    # Close cached upstream provider connections (drains httpx pools)
     with suppress(Exception):
-        await app.state.redis.close()
+        await get_registry().close_all()
+
+    shutdown_redis = getattr(app.state, "redis", None)
+    if shutdown_redis is not None:
+        with suppress(Exception):
+            # redis-py >= 5 uses aclose(); older versions use close().
+            close = getattr(shutdown_redis, "aclose", None) or shutdown_redis.close
+            result = close()
+            if asyncio.iscoroutine(result):
+                await result
     await close_pool()
 
 

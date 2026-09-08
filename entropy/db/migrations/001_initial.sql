@@ -13,7 +13,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS api_keys (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     key_hash        TEXT NOT NULL,
-    key_prefix      VARCHAR(12) NOT NULL,           -- first 8 chars for lookup
+    key_prefix      VARCHAR(12) NOT NULL,           -- first 12 chars for lookup
     name            VARCHAR(255) NOT NULL,
     user_id         VARCHAR(255),
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,

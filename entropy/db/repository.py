@@ -134,6 +134,24 @@ class RequestLogRepository:
                 "last_event_at": row["last_event_at"].isoformat() if row["last_event_at"] else None,
             }
 
+    async def delete_old_logs(self, *, days: int) -> int:
+        """Delete request logs older than *days*. Returns rows deleted.
+
+        Used by the retention background task to keep the audit table bounded.
+        """
+        if self.pool is None or days <= 0:
+            return 0
+        async with self.pool.acquire() as conn:
+            result: str = await conn.execute(
+                "DELETE FROM request_logs "
+                "WHERE created_at < NOW() - ($1::text || ' days')::interval",
+                str(days),
+            )
+            try:
+                return int(result.rsplit(maxsplit=1)[-1])
+            except (ValueError, IndexError):
+                return 0
+
     async def top_threat_categories(
         self, *, hours: int = 24, limit: int = 8
     ) -> list[dict[str, Any]]:
@@ -276,3 +294,23 @@ class APIKeyRepository:
                 uuid.UUID(key_id),
             )
             return result == "UPDATE 1"
+
+    async def touch_last_used(self, key_id: str) -> None:
+        """Refresh ``last_used_at``, throttled to avoid write contention.
+
+        The UPDATE only fires when the stored timestamp is NULL or older
+        than 5 minutes, so the common case is a cheap index probe with no
+        row modification (replaces the old per-insert trigger).
+        """
+        if self.pool is None:
+            return
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE api_keys
+                SET last_used_at = NOW()
+                WHERE id = $1
+                  AND (last_used_at IS NULL OR last_used_at < NOW() - INTERVAL '5 minutes')
+                """,
+                uuid.UUID(key_id),
+            )

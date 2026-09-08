@@ -52,7 +52,13 @@ async def close_pool() -> None:
 
 
 async def init_database() -> None:
-    """Initialize database schema from migration files."""
+    """Initialize database schema from migration files.
+
+    Applies each ``*.sql`` file exactly once, tracked in the
+    ``schema_migrations`` table. Each migration runs inside a transaction so
+    partial application is impossible, and ``ALTER TABLE``-style migrations
+    work (unlike the old DuplicateTableError-skip approach).
+    """
     from pathlib import Path  # noqa: PLC0415
 
     pool = await get_pool()
@@ -61,13 +67,30 @@ async def init_database() -> None:
     migration_files = sorted(migration_dir.glob("*.sql"))
 
     async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                filename   TEXT PRIMARY KEY,
+                applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        applied_rows = await conn.fetch("SELECT filename FROM schema_migrations")
+        applied = {row["filename"] for row in applied_rows}
+
         for migration_file in migration_files:
+            if migration_file.name in applied:
+                logger.debug("Migration already applied", file=migration_file.name)
+                continue
             sql = migration_file.read_text(encoding="utf-8")
             try:
-                await conn.execute(sql)
+                async with conn.transaction():
+                    await conn.execute(sql)
+                    await conn.execute(
+                        "INSERT INTO schema_migrations (filename) VALUES ($1)",
+                        migration_file.name,
+                    )
                 logger.info("Migration applied", file=migration_file.name)
-            except asyncpg.exceptions.DuplicateTableError:
-                logger.debug("Migration already applied", file=migration_file.name)
             except Exception as exc:
                 logger.error(
                     "Migration failed",
