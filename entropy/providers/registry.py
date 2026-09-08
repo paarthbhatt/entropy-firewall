@@ -6,6 +6,7 @@ LLM providers based on model name prefixes or explicit configuration.
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import structlog
@@ -15,6 +16,67 @@ from entropy.providers.base import BaseProvider  # noqa: TC001
 from entropy.providers.openai_provider import OpenAIProvider
 
 logger = structlog.get_logger(__name__)
+
+
+class CircuitBreaker:
+    """Lightweight in-memory circuit breaker for upstream LLM providers.
+
+    Trips open after ``failure_threshold`` consecutive failures and fails
+    fast for ``cooldown_seconds`` before allowing a trial request through.
+    Prevents every request from waiting out the full upstream timeout when
+    a provider is down.
+    """
+
+    def __init__(self, failure_threshold: int = 5, cooldown_seconds: float = 30.0) -> None:
+        self.failure_threshold = failure_threshold
+        self.cooldown_seconds = cooldown_seconds
+        self._consecutive_failures = 0
+        self._opened_at: float | None = None
+
+    @property
+    def is_open(self) -> bool:
+        """Return True if the circuit is currently open (fail fast)."""
+        if self._opened_at is None:
+            return False
+        if (time.monotonic() - self._opened_at) >= self.cooldown_seconds:
+            # Cooldown elapsed — allow one trial request (half-open).
+            self._opened_at = None
+            self._consecutive_failures = 0
+            return False
+        return True
+
+    def allow(self) -> bool:
+        """Check whether a request may proceed."""
+        return not self.is_open
+
+    def record_success(self) -> None:
+        """Reset failure state after a successful call."""
+        self._consecutive_failures = 0
+        self._opened_at = None
+
+    def record_failure(self) -> None:
+        """Record a failed call, tripping the breaker at the threshold."""
+        self._consecutive_failures += 1
+        if self._consecutive_failures >= self.failure_threshold:
+            self._opened_at = time.monotonic()
+            logger.warning(
+                "Circuit breaker opened",
+                failures=self._consecutive_failures,
+                cooldown_seconds=self.cooldown_seconds,
+            )
+
+
+_breakers: dict[str, CircuitBreaker] = {}
+
+
+def get_circuit_breaker(provider_name: str) -> CircuitBreaker:
+    """Get (or create) the circuit breaker for a provider."""
+    breaker = _breakers.get(provider_name)
+    if breaker is None:
+        breaker = CircuitBreaker()
+        _breakers[provider_name] = breaker
+    return breaker
+
 
 # Model prefix to provider mapping
 # These prefixes are used to automatically route requests to the correct provider
@@ -90,43 +152,6 @@ def _load_openrouter_provider() -> type[BaseProvider] | None:
         return None
 
 
-def _load_google_provider() -> type[BaseProvider] | None:
-    """Lazily load Google provider."""
-    try:
-        from entropy.providers.google_provider import (  # noqa: PLC0415
-            GoogleProvider,
-        )
-
-        return GoogleProvider
-    except ImportError:
-        logger.warning("GoogleProvider not available - install google-generativeai package")
-        return None
-
-
-def _load_groq_provider() -> type[BaseProvider] | None:
-    """Lazily load Groq provider."""
-    try:
-        from entropy.providers.groq_provider import GroqProvider  # noqa: PLC0415
-
-        return GroqProvider
-    except ImportError:
-        logger.warning("GroqProvider not available - install groq package")
-        return None
-
-
-def _load_openrouter_provider() -> type[BaseProvider] | None:
-    """Lazily load OpenRouter provider."""
-    try:
-        from entropy.providers.openrouter_provider import (  # noqa: PLC0415
-            OpenRouterProvider,
-        )
-
-        return OpenRouterProvider
-    except ImportError:
-        logger.warning("OpenRouterProvider not available")
-        return None
-
-
 def get_provider_class(name: str) -> type[BaseProvider] | None:
     """Get a provider class by name with lazy loading.
 
@@ -170,7 +195,16 @@ class ProviderRegistry:
 
     def __init__(self) -> None:
         self._instances: dict[str, BaseProvider] = {}
-        self._settings = get_settings()
+
+    @property
+    def _settings(self):  # type: ignore[no-untyped-def]
+        """Always read fresh settings (the accessor itself is LRU-cached).
+
+        The registry singleton must not pin the settings object from first
+        construction, otherwise credential changes (or test env patching)
+        are silently ignored.
+        """
+        return get_settings()
 
     def detect_provider(self, model: str, override: str | None = None) -> str:
         """Detect which provider should handle a given model.
@@ -248,9 +282,16 @@ class ProviderRegistry:
             api_key = self._get_api_key(provider_name)
 
         if api_key is None:
+            env_hint = {
+                "openai": "OPENAI_API_KEY",
+                "anthropic": "ANTHROPIC_API_KEY",
+                "google": "GOOGLE_API_KEY",
+                "groq": "GROQ_API_KEY",
+                "openrouter": "OPENROUTER_API_KEY",
+            }.get(provider_name, f"{provider_name.upper()}_API_KEY")
             raise ValueError(
                 f"No API key configured for provider '{provider_name}'. "
-                f"Set the appropriate environment variable (e.g., ANTHROPIC_API_KEY)."
+                f"Set the appropriate environment variable (e.g., {env_hint})."
             )
 
         # Get base URL from settings if not provided
@@ -371,7 +412,9 @@ def get_registry() -> ProviderRegistry:
 
 __all__ = [
     "MODEL_PREFIX_MAP",
+    "CircuitBreaker",
     "ProviderRegistry",
+    "get_circuit_breaker",
     "get_provider_class",
     "get_registry",
 ]
