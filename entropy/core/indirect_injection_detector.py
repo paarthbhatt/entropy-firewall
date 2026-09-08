@@ -15,8 +15,15 @@ This module:
 
 from __future__ import annotations
 
+import http.client
+import ipaddress
 import re
-from typing import TYPE_CHECKING
+import socket
+import ssl
+import urllib.error
+import urllib.request
+from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     from entropy.core.input_sanitizer import InputSanitizer
@@ -63,6 +70,164 @@ _URL_RE = re.compile(
     r"https?://[^\s<>\"')\]]+",
     re.IGNORECASE,
 )
+
+# Ports that must never be fetched (SSRF risk even on public hosts)
+_BLOCKED_PORTS = {22, 23, 25, 3306, 5432, 6379, 6380, 11211, 27017}
+
+
+class _UnsafeFetchError(Exception):
+    """Internal: a URL or hostname failed SSRF validation."""
+
+
+def _is_public_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Return True only for globally routable addresses."""
+    return not (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
+
+
+def _is_url_shape_safe(url: str) -> bool:
+    """Validate URL scheme, credentials, hostname, and port (no DNS lookup)."""
+    try:
+        parsed = urlparse(url)
+        port = parsed.port
+        hostname_ok = bool(parsed.hostname)
+    except ValueError:
+        return False
+
+    scheme_ok = parsed.scheme in ("http", "https")
+    creds_ok = not parsed.username and not parsed.password
+    port_ok = port is None or (1 <= port <= 65535 and port not in _BLOCKED_PORTS)
+    return scheme_ok and creds_ok and hostname_ok and port_ok
+
+
+def _resolve_validated_ips(
+    hostname: str,
+) -> list[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+    """Resolve *hostname* and return its public IP addresses.
+
+    Raises :class:`_UnsafeFetchError` when resolution fails or any resolved
+    address is private, loopback, link-local, multicast, reserved, or
+    unspecified.  Connecting to a returned address — instead of resolving
+    the hostname a second time — closes the DNS-rebinding TOCTOU window.
+    """
+    try:
+        addr_infos = socket.getaddrinfo(hostname, None, family=socket.AF_UNSPEC)
+    except OSError as exc:
+        raise _UnsafeFetchError(f"cannot resolve hostname {hostname!r}") from exc
+
+    ips: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
+    for _family, _socktype, _proto, _canonname, sockaddr in addr_infos:
+        try:
+            ip = ipaddress.ip_address(sockaddr[0])
+        except ValueError as exc:
+            raise _UnsafeFetchError(f"unparseable address for {hostname!r}") from exc
+        if not _is_public_ip(ip):
+            raise _UnsafeFetchError(f"{hostname!r} resolves to non-public address {ip}")
+        ips.append(ip)
+
+    if not ips:
+        raise _UnsafeFetchError(f"{hostname!r} has no addresses")
+    return ips
+
+
+def _is_url_safe_to_fetch(url: str) -> bool:
+    """Defensive SSRF check: only public HTTP(S) URLs without credentials.
+
+    Validates the URL shape, then requires every resolved address to be
+    public.  Used as a fail-fast pre-check; the actual connection pins a
+    freshly validated address (see :class:`_ValidatedHTTPConnection`).
+    """
+    if not _is_url_shape_safe(url):
+        return False
+    hostname = urlparse(url).hostname
+    if not hostname:
+        return False
+    try:
+        _resolve_validated_ips(hostname)
+    except _UnsafeFetchError:
+        return False
+    return True
+
+
+class _ValidatedHTTPConnection(http.client.HTTPConnection):
+    """HTTP connection pinned to a freshly validated public IP.
+
+    The connection resolves the target hostname itself, validates every
+    address, and connects to the validated result — there is no second,
+    unvalidated resolution, so DNS rebinding cannot swap in an internal
+    address between check and use.
+    """
+
+    def connect(self) -> None:
+        ips = _resolve_validated_ips(self.host)
+        self.sock = socket.create_connection((str(ips[0]), self.port), timeout=self.timeout)
+
+
+class _ValidatedHTTPSConnection(http.client.HTTPSConnection):
+    """HTTPS connection pinned to a validated public IP.
+
+    TLS SNI and certificate verification still use the original hostname,
+    so IP pinning does not weaken certificate checks.
+    """
+
+    def __init__(self, *args: Any, context: ssl.SSLContext | None = None, **kwargs: Any) -> None:
+        if context is None:
+            context = ssl.create_default_context()
+        super().__init__(*args, context=context, **kwargs)
+        self.tls_context = context
+
+    def connect(self) -> None:
+        ips = _resolve_validated_ips(self.host)
+        sock = socket.create_connection((str(ips[0]), self.port), timeout=self.timeout)
+        self.sock = self.tls_context.wrap_socket(sock, server_hostname=self.host)
+
+
+class _ValidatedHTTPHandler(urllib.request.HTTPHandler):
+    """HTTP handler using connections pinned to validated public IPs."""
+
+    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        return self.do_open(_ValidatedHTTPConnection, req)
+
+
+class _ValidatedHTTPSHandler(urllib.request.HTTPSHandler):
+    """HTTPS handler using connections pinned to validated public IPs."""
+
+    def __init__(self, context: ssl.SSLContext) -> None:
+        super().__init__(context=context)
+        self.validated_context = context
+
+    def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        return self.do_open(_ValidatedHTTPSConnection, req, context=self.validated_context)
+
+
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Redirect handler that validates every redirect target.
+
+    ``urllib`` follows redirects by default, which would let a safe public
+    URL bounce (302) to an internal address.  Each hop is re-validated
+    here; the subsequent connection re-pins DNS as well.
+    """
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: http.client.HTTPMessage,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        if not _is_url_shape_safe(newurl):
+            raise urllib.error.HTTPError(
+                newurl, code, "blocked unsafe redirect target (SSRF)", headers, fp
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 # ---------------------------------------------------------------------------
@@ -307,20 +472,30 @@ class IndirectInjectionDetector:
     def _fetch_url_content(url: str) -> str | None:
         """Fetch and return text content from a URL.
 
-        Returns None on any error.  This is intentionally conservative
-        (short timeout, max size) to avoid abuse.
+        Returns None on any error.  This is intentionally conservative:
+        short timeout, max size, no proxy support, per-hop redirect
+        validation, and connections pinned to freshly validated public
+        IPs (SSRF protection including DNS rebinding).
         """
+        if not _is_url_safe_to_fetch(url):
+            logger.warning("Blocked unsafe URL fetch (SSRF protection)", url=url)
+            return None
         try:
-            import urllib.request  # noqa: PLC0415
-
+            context = ssl.create_default_context()
+            opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({}),  # never use environment proxies
+                _ValidatedHTTPHandler(),
+                _ValidatedHTTPSHandler(context=context),
+                _SafeRedirectHandler(),
+            )
             req = urllib.request.Request(
                 url,
                 headers={"User-Agent": "EntropyFirewall/0.1"},
             )
-            with urllib.request.urlopen(req, timeout=3) as resp:
+            with opener.open(req, timeout=3) as resp:
                 # Max 100KB to prevent resource abuse
-                data = resp.read(102_400)
-                return str(data.decode("utf-8", errors="replace"))
+                data: bytes = resp.read(102_400)
+                return data.decode("utf-8", errors="replace")
         except Exception as e:
             logger.debug("Failed to fetch URL for analysis", url=url, error=str(e))
             return None
