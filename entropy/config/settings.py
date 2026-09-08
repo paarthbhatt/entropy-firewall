@@ -129,6 +129,10 @@ class DatabaseSettings(BaseSettings):
     password: str = Field(default="entropy_password", description="Database password")
     min_connections: int = Field(default=2, description="Minimum pool connections")
     max_connections: int = Field(default=10, description="Maximum pool connections")
+    log_retention_days: int = Field(
+        default=90,
+        description="Delete request_logs older than this (0 disables retention purge)",
+    )
 
     @property
     def dsn(self) -> str:
@@ -196,6 +200,14 @@ class Settings(BaseSettings):
     master_api_key: str = Field(
         default="ent-change-this-in-production",
         description="Master API key for bootstrap. CHANGE IN PRODUCTION.",
+    )
+    metrics_token: str | None = Field(
+        default=None,
+        description=(
+            "Optional bearer token protecting /metrics. When set, clients must "
+            "send 'Authorization: Bearer <token>'. Unset keeps /metrics open "
+            "(default, Prometheus-friendly)."
+        ),
     )
 
     # LLM Provider

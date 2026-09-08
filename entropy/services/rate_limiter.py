@@ -102,8 +102,15 @@ class RateLimitService:
         *,
         api_key_id: str | None = None,
         client_ip: str = "unknown",
+        per_key_rpm: int | None = None,
     ) -> tuple[bool, dict[str, Any]]:
         """Run all configured rate-limit checks.
+
+        Args:
+            api_key_id: API key identifier for the per-user tier.
+            client_ip: Client IP for the per-IP tier.
+            per_key_rpm: Optional per-key override (from the ``api_keys``
+                table). Falls back to the global ``rpm`` setting when unset.
 
         Returns:
             (overall_allowed, combined_info)
@@ -111,6 +118,7 @@ class RateLimitService:
         window = self._settings.window
         burst = self._settings.burst
         checks: list[tuple[str, bool, dict[str, Any]]] = []
+        user_limit = per_key_rpm if per_key_rpm and per_key_rpm > 0 else self._settings.rpm
 
         # 1. Global
         if self._settings.global_rpm > 0:
@@ -125,10 +133,10 @@ class RateLimitService:
         )
         checks.append(("ip", ok, info))
 
-        # 3. Per-user (API key)
+        # 3. Per-user (API key), honoring per-key overrides
         if api_key_id:
             ok, info = await self.limiter.is_allowed(
-                f"user:{api_key_id}", self._settings.rpm, window, burst
+                f"user:{api_key_id}", user_limit, window, burst
             )
             checks.append(("user", ok, info))
 

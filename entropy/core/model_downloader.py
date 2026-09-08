@@ -15,12 +15,19 @@ from __future__ import annotations
 
 import hashlib
 import os
+import ssl
 import urllib.request
 from pathlib import Path
 
 import structlog
 
 logger = structlog.get_logger(__name__)
+
+
+def _tls_context() -> ssl.SSLContext:
+    """Return a TLS context with certificate verification enforced."""
+    return ssl.create_default_context()
+
 
 DEFAULT_MODEL_DIR = Path.home() / ".entropy" / "models"
 DEFAULT_MODEL_NAME = "entropy-classifier.onnx"
@@ -72,12 +79,18 @@ def ensure_model(
 
     tmp_path = target.with_suffix(".onnx.tmp")
 
+    if not expected_sha256:
+        logger.warning(
+            "Downloading model without SHA256 verification — "
+            "supply expected_sha256 to protect against MITM/tampering"
+        )
+
     try:
         req = urllib.request.Request(
             url,
             headers={"User-Agent": "EntropyFirewall/0.1"},
         )
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=120, context=_tls_context()) as resp:
             total = int(resp.headers.get("Content-Length", 0))
             downloaded = 0
             sha = hashlib.sha256()

@@ -55,8 +55,9 @@ class AuthService:
         if not raw_key:
             return None
 
-        # Master key bypass (for initial setup / admin ops)
-        if raw_key == self._master_key:
+        # Master key bypass (for initial setup / admin ops).
+        # Timing-safe comparison to prevent byte-by-byte key recovery.
+        if self._master_key and secrets.compare_digest(raw_key, self._master_key):
             logger.info("Master API key used")
             return {
                 "id": "master",
@@ -83,6 +84,13 @@ class AuthService:
             if record["expires_at"] < datetime.now(UTC):
                 logger.warning("API key expired", prefix=prefix)
                 return None
+
+        # Refresh last-used timestamp (throttled server-side; cheap no-op
+        # when recently updated). Never blocks authentication on DB errors.
+        try:
+            await self.repo.touch_last_used(str(record["id"]))
+        except Exception as exc:
+            logger.debug("Failed to touch API key last_used_at", error=str(exc))
 
         return record
 
