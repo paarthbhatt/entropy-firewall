@@ -67,9 +67,12 @@ class SecureOpenAIClient:
 
     @property
     def chat(self) -> Any:
-        """Access chat completions - OpenAI compatible."""
-        if self._via_firewall:
-            return self._client.chat
+        """Access chat completions - OpenAI compatible.
+
+        Both branches route through ``self._client``: when ``entropy_url`` is
+        set that client is the firewall-backed ``EntropyClient``, otherwise it
+        is the direct OpenAI client.
+        """
         return self._client.chat
 
     @property
@@ -132,8 +135,11 @@ class _ModelNamespace:
         self._client = client
 
     def list(self) -> Any:
-        # Would need to implement this
-        return {"data": []}
+        """List models via the firewall's OpenAI-compatible endpoint."""
+        try:
+            return self._client._request("GET", "/v1/models")
+        except Exception:
+            return {"data": []}
 
 
 def _get_suggestion(threat: dict[str, Any]) -> str:

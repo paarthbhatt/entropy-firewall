@@ -21,6 +21,7 @@ Usage::
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -62,7 +63,7 @@ class CompletionsNamespace:
     def __init__(self, client: EntropyClient):
         self._client = client
 
-    def create(self, **kwargs: Any) -> dict[str, Any]:
+    def create(self, **kwargs: Any) -> dict[str, Any] | Generator[str, None, None]:
         return self._client._post_chat_completions(**kwargs)
 
 
@@ -70,7 +71,7 @@ class AsyncCompletionsNamespace:
     def __init__(self, client: AsyncEntropyClient):
         self._client = client
 
-    async def create(self, **kwargs: Any) -> dict[str, Any]:
+    async def create(self, **kwargs: Any) -> dict[str, Any] | AsyncGenerator[str, None]:
         return await self._client._post_chat_completions(**kwargs)
 
 
@@ -137,27 +138,31 @@ class EntropyClient:
             resp.raise_for_status()
             return resp.json()
         except httpx.RequestError as e:
-            raise EntropyConnectionError(f"Connection error: {e}") from None
+            raise EntropyConnectionError(f"Connection error: {e}") from e
 
-    async def _stream_request(self, method: str, path: str, **kwargs) -> AsyncGenerator[str, None]:
+    def _stream_request(self, method: str, path: str, **kwargs: Any) -> Generator[str, None, None]:
+        """Synchronous SSE stream over the sync ``httpx.Client``."""
         try:
-            async with self._http.stream(method, path, **kwargs) as resp:
+            with self._http.stream(method, path, **kwargs) as resp:
                 if resp.status_code == 403:
-                    data = await resp.read()
-                    import json  # noqa: PLC0415
-
                     try:
-                        err = json.loads(data)
+                        err = json.loads(resp.read().decode("utf-8", errors="replace"))
                     except Exception:
                         err = {}
                     raise EntropyBlockedError("Request blocked by Entropy", err)
+                if resp.status_code == 429:
+                    try:
+                        err = json.loads(resp.read().decode("utf-8", errors="replace"))
+                    except Exception:
+                        err = {}
+                    raise EntropyRateLimitError("Rate limit exceeded", err)
 
                 resp.raise_for_status()
-                async for line in resp.aiter_lines():
+                for line in resp.iter_lines():
                     if line:
                         yield line
         except httpx.RequestError as e:
-            raise EntropyConnectionError(f"Connection error: {e}") from None
+            raise EntropyConnectionError(f"Connection error: {e}") from e
 
     def close(self) -> None:
         self._http.close()
@@ -209,7 +214,7 @@ class AsyncEntropyClient:
 
     async def _post_chat_completions(
         self, **kwargs: Any
-    ) -> dict[str, Any] | Generator[str, None, None]:
+    ) -> dict[str, Any] | AsyncGenerator[str, None]:
         stream = kwargs.get("stream", False)
         if stream:
             return self._stream_request("POST", "/v1/chat/completions", json=kwargs)
@@ -225,27 +230,35 @@ class AsyncEntropyClient:
             resp.raise_for_status()
             return resp.json()
         except httpx.RequestError as e:
-            raise EntropyConnectionError(f"Connection error: {e}") from None
+            raise EntropyConnectionError(f"Connection error: {e}") from e
 
-    def _stream_request(self, method: str, path: str, **kwargs) -> Generator[str, None, None]:
+    async def _stream_request(
+        self, method: str, path: str, **kwargs: Any
+    ) -> AsyncGenerator[str, None]:
+        """Asynchronous SSE stream over the async ``httpx.AsyncClient``."""
         try:
-            with self._http.stream(method, path, **kwargs) as resp:
+            async with self._http.stream(method, path, **kwargs) as resp:
                 if resp.status_code == 403:
                     try:
-                        data = resp.read()
-                        import json  # noqa: PLC0415
-
-                        err = json.loads(data)
+                        raw = await resp.aread()
+                        err = json.loads(raw.decode("utf-8", errors="replace"))
                     except Exception:
                         err = {}
                     raise EntropyBlockedError("Request blocked by Entropy", err)
+                if resp.status_code == 429:
+                    try:
+                        raw = await resp.aread()
+                        err = json.loads(raw.decode("utf-8", errors="replace"))
+                    except Exception:
+                        err = {}
+                    raise EntropyRateLimitError("Rate limit exceeded", err)
 
                 resp.raise_for_status()
-                for line in resp.iter_lines():
+                async for line in resp.aiter_lines():
                     if line:
                         yield line
         except httpx.RequestError as e:
-            raise EntropyConnectionError(f"Connection error: {e}") from None
+            raise EntropyConnectionError(f"Connection error: {e}") from e
 
     async def close(self) -> None:
         await self._http.aclose()
