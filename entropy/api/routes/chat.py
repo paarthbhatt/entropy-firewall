@@ -24,6 +24,7 @@ from entropy.api.dependencies import (
 )
 from entropy.core.engine import EntropyEngine  # noqa: TC001
 from entropy.db.repository import RequestLogRepository  # noqa: TC001
+from entropy.dlp.streaming_output_filter import SSEStreamingFilter
 from entropy.models.schemas import (
     ChatCompletionRequest,
     ChatCompletionResponse,
@@ -35,7 +36,8 @@ from entropy.models.schemas import (
     ModelListResponse,
     ThreatLevel,
 )
-from entropy.providers.openai_provider import OpenAIProvider  # noqa: TC001
+from entropy.providers.base import BaseProvider  # noqa: TC001
+from entropy.providers.registry import get_circuit_breaker
 from entropy.services.metrics import (
     ANALYSIS_DURATION,
     OUTPUT_SANITIZATIONS,
@@ -51,6 +53,80 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["chat"])
+
+_THREAT_SEVERITY_ORDER = {"safe": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+
+
+def provider_label(provider: Any) -> str:
+    """Return the provider name for metrics/logs (never hardcoded)."""
+    return getattr(provider, "name", None) or "openai"
+
+
+def top_threat_level(verdict: EntropyVerdict) -> str:
+    """Return the highest threat level in a verdict as a string."""
+    if not verdict.threats_detected:
+        return ThreatLevel.SAFE.value
+    return max(
+        (t.threat_level for t in verdict.threats_detected),
+        key=lambda level: _THREAT_SEVERITY_ORDER.get(level.value, 0),
+        default=ThreatLevel.SAFE,
+    ).value
+
+
+def rate_limit_headers(rl_info: dict[str, Any]) -> dict[str, str]:
+    """Build ``X-RateLimit-*`` headers from the most specific tier checked."""
+    checks = rl_info.get("checks", {})
+    for tier in ("user", "ip", "global"):
+        info = checks.get(tier)
+        if isinstance(info, dict):
+            return {
+                "X-RateLimit-Limit": str(info.get("limit", "")),
+                "X-RateLimit-Remaining": str(info.get("remaining", "")),
+                "X-RateLimit-Reset": str(info.get("reset_after_seconds", "")),
+            }
+    return {}
+
+
+async def write_audit_log(
+    log_repo: RequestLogRepository,
+    *,
+    api_key_id: str,
+    client_ip: str,
+    provider_name: str,
+    model: str,
+    message_count: int,
+    verdict: EntropyVerdict,
+    analysis_ms: float,
+    provider_ms: float,
+    total_ms: float,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    output_sanitized: bool = False,
+    sanitizations: list[dict[str, Any]] | None = None,
+) -> None:
+    """Persist an audit record; never fails the request on DB errors."""
+    try:
+        await log_repo.create(
+            api_key_id=api_key_id if api_key_id != "master" else None,
+            client_ip=client_ip,
+            provider=provider_name,
+            model=model,
+            message_count=message_count,
+            input_tokens=prompt_tokens,
+            status=verdict.status.value,
+            threat_level=top_threat_level(verdict),
+            confidence=verdict.confidence,
+            threats=[t.model_dump() for t in verdict.threats_detected],
+            output_tokens=completion_tokens,
+            output_sanitized=output_sanitized,
+            sanitizations=sanitizations or [],
+            processing_ms=analysis_ms,
+            provider_ms=provider_ms,
+            total_ms=total_ms,
+        )
+    except Exception as exc:
+        # Don't fail the request if logging fails
+        logger.error("Failed to write audit log", error=str(exc))
 
 
 @router.get("/v1/models", response_model=ModelListResponse)
@@ -106,9 +182,10 @@ async def analyze_content(
 async def chat_completions(  # noqa: PLR0912, PLR0915
     body: ChatCompletionRequest,
     request: Request,
+    response: Response,
     auth_record: dict[str, Any] = Depends(require_auth),  # noqa: B008
     engine: EntropyEngine = Depends(get_engine),  # noqa: B008
-    provider: OpenAIProvider = Depends(get_provider),  # noqa: B008
+    provider: BaseProvider = Depends(get_provider),  # noqa: B008
     rate_limiter: RateLimitService = Depends(get_rate_limiter),  # noqa: B008
     log_repo: RequestLogRepository = Depends(get_request_log_repo),  # noqa: B008
     sec_logger: SecurityLogger = Depends(get_security_logger),  # noqa: B008
@@ -117,12 +194,16 @@ async def chat_completions(  # noqa: PLR0912, PLR0915
     total_start = time.perf_counter()
     client_ip = request.client.host if request.client else "unknown"
     api_key_id = str(auth_record.get("id", ""))
+    provider_name = provider_label(provider)
 
     # ---- 1. Rate limiting --------------------------------------------------
     allowed, rl_info = await rate_limiter.check(
         api_key_id=api_key_id,
         client_ip=client_ip,
+        per_key_rpm=auth_record.get("rate_limit_rpm"),
     )
+    for header, value in rate_limit_headers(rl_info).items():
+        response.headers[header] = value
     if not allowed:
         REQUESTS_TOTAL.labels(status="rate_limited", provider="none").inc()
         await sec_logger.log_rate_limited(
@@ -139,6 +220,7 @@ async def chat_completions(  # noqa: PLR0912, PLR0915
                 "Retry-After": str(
                     rl_info.get("checks", {}).get("ip", {}).get("reset_after_seconds", 60)
                 ),
+                **rate_limit_headers(rl_info),
             },
         )
 
@@ -193,31 +275,75 @@ async def chat_completions(  # noqa: PLR0912, PLR0915
         if val is not None:
             extra_kwargs[k] = val
 
-    # Streaming Logic
+    # Circuit breaker — fail fast when the upstream provider is down
+    breaker = get_circuit_breaker(provider_name)
+    if not breaker.allow():
+        logger.warning("Circuit breaker open — rejecting request", provider=provider_name)
+        REQUESTS_TOTAL.labels(status="error", provider=provider_name).inc()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Upstream provider temporarily unavailable, please retry shortly",
+        )
+
+    # Streaming Logic — filtered through the sliding-window SSE DLP filter
+    # so streaming responses get the same PII/secret redaction as
+    # non-streaming ones, plus a post-stream audit record.
     if body.stream:
 
         async def secure_stream() -> AsyncGenerator[str, None]:
-            REQUESTS_TOTAL.labels(status="allowed", provider="openai").inc()
-
-            # Create a stream from provider
-            # Note: real implementation needs async stream support in provider
-            # converting sync iterator to async for compatibility in this example
-            stream_iter = provider.chat_completion_stream(
-                model=body.model,
-                messages=messages_dicts,
-                **extra_kwargs,
+            engine_output_filter = getattr(engine, "output_filter", None)
+            sse_filter = SSEStreamingFilter(
+                enable_pii=getattr(engine_output_filter, "enable_pii", True),
+                enable_code=getattr(engine_output_filter, "enable_code", True),
             )
+            try:
+                stream_iter = provider.chat_completion_stream(
+                    model=body.model,
+                    messages=messages_dicts,
+                    **extra_kwargs,
+                )
+                async for chunk in sse_filter.process_sse_stream(stream_iter):
+                    yield chunk
+                breaker.record_success()
+            except Exception as exc:
+                breaker.record_failure()
+                logger.error("Streaming provider call failed", error=str(exc))
+                yield 'data: {"error": "Upstream provider error"}\n\n'
+                yield "data: [DONE]\n\n"
 
-            # First chunk: send usage/metadata (optional in OAI spec but good for us)
-            # Then yield chunks
-            async for chunk in stream_iter:
-                # Security scanning on chunks could happen here
-                # For output filtering on stream, we'd need a buffer
-                yield chunk
+            # Post-stream bookkeeping: metrics, security log, audit trail
+            summary = sse_filter.output_filter.get_summary()
+            stream_sanitized = summary["total_redactions"] > 0
+            for detection in sse_filter.output_filter.total_detections:
+                OUTPUT_SANITIZATIONS.labels(rule=detection.get("rule", "unknown")).inc()
+            REQUESTS_TOTAL.labels(status="allowed", provider=provider_name).inc()
+            if stream_sanitized:
+                try:
+                    await sec_logger.log_pii_detected(
+                        client_ip=client_ip,
+                        detections=sse_filter.output_filter.total_detections,
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to log streaming PII event", error=str(exc))
+            await write_audit_log(
+                log_repo,
+                api_key_id=api_key_id,
+                client_ip=client_ip,
+                provider_name=provider_name,
+                model=body.model,
+                message_count=len(body.messages),
+                verdict=verdict,
+                analysis_ms=analysis_ms,
+                provider_ms=0.0,
+                total_ms=round((time.perf_counter() - total_start) * 1000, 2),
+                output_sanitized=stream_sanitized,
+                sanitizations=sse_filter.output_filter.total_detections,
+            )
 
         return StreamingResponse(
             secure_stream(),
             media_type="text/event-stream",
+            headers=rate_limit_headers(rl_info),
         )
 
     # Non-streaming
@@ -228,12 +354,16 @@ async def chat_completions(  # noqa: PLR0912, PLR0915
             messages=messages_dicts,
             **extra_kwargs,
         )
+        breaker.record_success()
     except Exception as exc:
-        logger.error("Provider call failed", error=str(exc))
-        REQUESTS_TOTAL.labels(status="error", provider="openai").inc()
+        breaker.record_failure()
+        # Log the full error server-side; return a generic message so
+        # upstream hostnames, key fragments, or tracebacks never leak.
+        logger.error("Provider call failed", provider=provider_name, error=str(exc))
+        REQUESTS_TOTAL.labels(status="error", provider=provider_name).inc()
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Upstream provider error: {exc}",
+            detail="Upstream provider error",
         ) from exc
     provider_ms = round((time.perf_counter() - provider_start) * 1000, 2)
 
@@ -276,48 +406,28 @@ async def chat_completions(  # noqa: PLR0912, PLR0915
 
     # ---- 6. Audit log -------------------------------------------------------
     total_ms = round((time.perf_counter() - total_start) * 1000, 2)
-    REQUESTS_TOTAL.labels(status="allowed", provider="openai").inc()
+    REQUESTS_TOTAL.labels(status="allowed", provider=provider_name).inc()
 
-    try:
-        # Calculate tokens if not provided
-        prompt_tokens = raw_response.get("usage", {}).get("prompt_tokens", 0)
-        completion_tokens = raw_response.get("usage", {}).get("completion_tokens", 0)
+    # Calculate tokens if not provided
+    prompt_tokens = raw_response.get("usage", {}).get("prompt_tokens", 0)
+    completion_tokens = raw_response.get("usage", {}).get("completion_tokens", 0)
 
-        await log_repo.create(
-            api_key_id=api_key_id if api_key_id != "master" else None,
-            client_ip=client_ip,
-            provider="openai",
-            model=body.model,
-            message_count=len(body.messages),
-            input_tokens=prompt_tokens,
-            status=verdict.status.value,
-            threat_level=(
-                max(
-                    (t.threat_level for t in verdict.threats_detected),
-                    key=lambda threat_level: {
-                        "safe": 0,
-                        "low": 1,
-                        "medium": 2,
-                        "high": 3,
-                        "critical": 4,
-                    }.get(threat_level.value, 0),
-                    default=ThreatLevel.SAFE,
-                ).value
-                if verdict.threats_detected
-                else "safe"
-            ),
-            confidence=verdict.confidence,
-            threats=[t.model_dump() for t in verdict.threats_detected],
-            output_tokens=completion_tokens,
-            output_sanitized=output_sanitized,
-            sanitizations=sanitization_detections,
-            processing_ms=analysis_ms,
-            provider_ms=provider_ms,
-            total_ms=total_ms,
-        )
-    except Exception as exc:
-        # Don't fail the request if logging fails
-        logger.error("Failed to write audit log", error=str(exc))
+    await write_audit_log(
+        log_repo,
+        api_key_id=api_key_id,
+        client_ip=client_ip,
+        provider_name=provider_name,
+        model=body.model,
+        message_count=len(body.messages),
+        verdict=verdict,
+        analysis_ms=analysis_ms,
+        provider_ms=provider_ms,
+        total_ms=total_ms,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        output_sanitized=output_sanitized,
+        sanitizations=sanitization_detections,
+    )
 
     return raw_response
 

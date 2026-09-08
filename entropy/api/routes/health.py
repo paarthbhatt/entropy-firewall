@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from starlette.responses import Response
 
 from entropy.api.dependencies import get_engine
@@ -24,7 +24,14 @@ async def health_check(
     request: Request,
     engine: EntropyEngine = Depends(get_engine),  # noqa: B008
 ) -> HealthResponse:
-    """Health check endpoint."""
+    """Health check endpoint.
+
+    Reports ``healthy`` when the detection engine is operational. Missing
+    Redis/PostgreSQL only downgrades to ``degraded`` when dependencies are
+    enforced (production); otherwise the firewall still scans correctly
+    without them and reports ``healthy`` with the per-dependency flags
+    showing what is down.
+    """
     settings = get_settings()
     patterns = engine.get_pattern_count()
     PATTERNS_LOADED.set(patterns)
@@ -40,7 +47,8 @@ async def health_check(
         except Exception:
             redis_ok = False
 
-    overall_status = "healthy" if redis_ok and db_ok else "degraded"
+    deps_required = bool(settings.enforce_dependencies)
+    overall_status = "healthy" if (redis_ok and db_ok) or not deps_required else "degraded"
 
     return HealthResponse(
         status=overall_status,
@@ -54,8 +62,22 @@ async def health_check(
 
 
 @router.get("/metrics")
-async def prometheus_metrics() -> Response:
-    """Prometheus-compatible metrics endpoint."""
+async def prometheus_metrics(request: Request) -> Response:
+    """Prometheus-compatible metrics endpoint.
+
+    Open by default for scrapers. If ``ENTROPY_METRICS_TOKEN`` is configured,
+    callers must present it as ``Authorization: Bearer <token>`` — this keeps
+    internal request/threat counters out of unauthenticated hands.
+    """
+    settings = get_settings()
+    expected = settings.metrics_token
+    if expected:
+        presented = request.headers.get("authorization", "")
+        if presented != f"Bearer {expected}":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Valid metrics bearer token required",
+            )
     return Response(
         content=get_metrics_text(),
         media_type="text/plain; charset=utf-8",

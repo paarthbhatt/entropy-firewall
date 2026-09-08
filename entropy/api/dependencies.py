@@ -9,11 +9,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import AsyncIterator
 
 import redis.asyncio as aioredis
 import structlog
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 
 from entropy.config import get_settings
 from entropy.core.engine import EntropyEngine
@@ -22,7 +22,7 @@ from entropy.db.repository import (
     RequestLogRepository,
     SecurityEventRepository,
 )
-from entropy.providers.openai_provider import OpenAIProvider
+from entropy.providers.registry import get_registry
 from entropy.services.auth import AuthService
 from entropy.services.rate_limiter import RateLimitService
 from entropy.services.security_logger import SecurityLogger
@@ -35,6 +35,10 @@ logger = structlog.get_logger(__name__)
 
 class _TestingProvider:
     """Minimal local provider used in tests when no OpenAI key is configured."""
+
+    @property
+    def name(self) -> str:
+        return "testing"
 
     async def chat_completion(
         self, model: str, messages: list[dict[str, Any]], **kwargs: Any
@@ -57,10 +61,13 @@ class _TestingProvider:
             "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
         }
 
-    def chat_completion_stream(
+    async def chat_completion_stream(
         self, model: str, messages: list[dict[str, Any]], **kwargs: Any
-    ) -> Generator[str, None, None]:
+    ) -> AsyncIterator[str]:
         yield "data: [DONE]\n\n"
+
+    async def close(self) -> None:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -92,24 +99,49 @@ def get_engine() -> EntropyEngine:
     return _engine_singleton()
 
 
-def get_provider() -> Any:
+def get_provider(
+    model: str | None = None,
+    provider_override: str | None = Header(default=None, alias="X-Entropy-Provider"),
+    model_header: str | None = Header(default=None, alias="X-Entropy-Model"),
+) -> Any:
+    """Resolve the upstream provider via the registry (cached per key/URL).
+
+    ``model`` may be supplied directly (tests/other callers), via the
+    ``X-Entropy-Model`` header, or fall back to a GPT default. An explicit
+    provider can be forced via ``provider_override`` or the
+    ``X-Entropy-Provider`` header. All parameters are optional so the
+    factory remains directly callable in tests and scripts.
+    """
     settings = get_settings()
-    if not settings.openai_api_key:
-        if settings.environment == "testing":
-            logger.warning("OPENAI_API_KEY not set in testing environment; using test provider")
-            return _TestingProvider()
+
+    # When called directly (tests/scripts), FastAPI's Header() markers are
+    # passed instead of real values — normalize them to plain defaults.
+    resolved_model = model if isinstance(model, str) and model else ""
+    if not resolved_model and isinstance(model_header, str):
+        resolved_model = model_header
+    override = provider_override if isinstance(provider_override, str) else None
+
+    if not settings.openai_api_key and settings.environment == "testing":
+        logger.warning("OPENAI_API_KEY not set in testing environment; using test provider")
+        return _TestingProvider()
+
+    try:
+        registry = get_registry()
+        return registry.get_provider(
+            resolved_model or "gpt-4",
+            provider_override=override,
+        )
+    except ValueError as exc:
+        detail = str(exc)
+        if "openai" in detail.lower():
+            detail += (
+                " Set OPENAI_API_KEY (or ENTROPY_OPENAI_API_KEY) and optionally "
+                "OPENAI_BASE_URL for OpenAI-compatible local/cloud endpoints."
+            )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "No upstream LLM credentials configured. Set OPENAI_API_KEY "
-                "(or ENTROPY_OPENAI_API_KEY) and optionally OPENAI_BASE_URL "
-                "for OpenAI-compatible local/cloud endpoints."
-            ),
-        )
-    return OpenAIProvider(
-        api_key=settings.openai_api_key,
-        base_url=settings.openai_base_url,
-    )
+            detail=detail,
+        ) from exc
 
 
 def get_request_log_repo(
