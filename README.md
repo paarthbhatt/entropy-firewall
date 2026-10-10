@@ -42,6 +42,7 @@ Entropy exposes an **OpenAI-compatible REST API**, meaning you can point your ex
 - [SDK Usage](#sdk-usage)
 - [CLI Reference](#cli-reference)
 - [Detection Engine](#detection-engine)
+- [Attack Catalog Expansion](catalog/README.md)
 - [Testing](#testing)
 - [Contributing](#contributing)
 - [License](#license)
@@ -52,7 +53,7 @@ Entropy exposes an **OpenAI-compatible REST API**, meaning you can point your ex
 
 | Feature | Details |
 |---|---|
-| 🛡️ **Pattern-Based Detection** | 28+ hand-tuned regex patterns across 8 OWASP-aligned threat categories |
+| 🛡️ **Pattern-Based Detection** | 24 active hand-tuned regex patterns across 8 OWASP-aligned threat categories |
 | 🧠 **Semantic Analysis** | ONNX-powered local ML model — no external API, < 5ms overhead |
 | 🔄 **Multi-Turn Context Analysis** | Detects escalation, probing, and slow-burn attacks across conversation history |
 | 🧹 **Input Sanitizer** | Recursively decodes 8 obfuscation layers (Base64, URL, HTML, ROT13, Leetspeak, fullwidth, hex, char-split) |
@@ -98,7 +99,7 @@ Entropy exposes an **OpenAI-compatible REST API**, meaning you can point your ex
 │  │ └─────────────────┘  └──────────────────────────┘ │   │
 │  │ ┌─────────────────┐  ┌──────────────────────────┐ │   │
 │  │ │ Pattern Matcher  │  │ Context Analyzer          │ │   │
-│  │ │ (28+ patterns,   │  │ (multi-turn escalation,  │ │   │
+│  │ │ (24 patterns,    │  │ (multi-turn escalation,  │ │   │
 │  │ │  8 categories)   │  │  probing detection)       │ │   │
 │  │ └─────────────────┘  └──────────────────────────┘ │   │
 │  │ ┌─────────────────┐                                │   │
@@ -374,6 +375,12 @@ entropy generate-key "my-application"
 | **Resource Abuse** | 2 | Infinite loops, token exhaustion |
 | **File System** | 1 | Path traversal |
 
+The [attack catalog expansion](catalog/README.md) documents all 24 active rules
+and a reproducible **10,800-case** labeled corpus: 7,200 attack variants and 3,600
+benign controls, spanning six encodings, five payload-language forms, and five
+actual request positions. Family results and proposed detection deltas are in
+[`reports/expansion-gaps.md`](reports/expansion-gaps.md).
+
 ### Threat Levels
 
 | Level | Score Range | Default Action |
@@ -413,7 +420,11 @@ uv run pytest tests/integration/ -v
 uv run pytest --cov=entropy --cov-report=html
 ```
 
-The test suite includes **70+ tests** across: pattern matcher, context analyzer, input sanitizer, indirect injection detector, semantic analyzer, output filter, and API integration.
+The test suite includes the existing 127 tests plus corpus integrity checks and
+10,800 per-case detection assertions. Recorded current detection gaps appear as
+xfails; new unrecorded label mismatches fail the suite. See the
+[catalog evaluation guide](catalog/README.md#generate-and-evaluate) for the
+offline profile, strict benchmark mode, and reproducible output artifacts.
 
 ---
 
