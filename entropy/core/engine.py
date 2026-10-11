@@ -20,6 +20,7 @@ from typing import Any
 import structlog
 
 from entropy.config import get_settings
+from entropy.core.content_extraction import extract_request_text
 from entropy.core.input_validator import InputValidator
 from entropy.core.output_filter import OutputFilter
 from entropy.core.pattern_matcher import PatternMatcher
@@ -367,15 +368,7 @@ class EntropyEngine:
 
     @staticmethod
     def _extract_text(request: ChatCompletionRequest) -> str:
-        parts: list[str] = []
-        for msg in request.messages:
-            if isinstance(msg.content, str):
-                parts.append(msg.content)
-            elif isinstance(msg.content, list):
-                for item in msg.content:
-                    if isinstance(item, dict) and item.get("type") == "text":
-                        parts.append(item.get("text", ""))
-        return "\n".join(parts)
+        return extract_request_text(request)
 
     @staticmethod
     def _elapsed_ms(start: float) -> float:
