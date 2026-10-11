@@ -319,19 +319,14 @@ class IndirectInjectionDetector:
 
     @staticmethod
     def _extract_all_content(request: ChatCompletionRequest) -> list[tuple[str, str]]:
-        """Extract text from ALL messages for hidden-marker scanning."""
-        results: list[tuple[str, str]] = []
-        for i, msg in enumerate(request.messages):
-            content = ""
-            if isinstance(msg.content, str):
-                content = msg.content
-            elif isinstance(msg.content, list):
-                for item in msg.content:
-                    if isinstance(item, dict) and item.get("type") == "text":
-                        content += item.get("text", "")
-            if content.strip():
-                results.append((f"msg[{i}]:{msg.role}", content))
-        return results
+        """Extract text from ALL messages for hidden-marker scanning.
+
+        Includes image alt text and function/tool-call argument values so
+        hidden markers in those surfaces are scanned like any other field.
+        """
+        from entropy.core.content_extraction import iter_request_texts  # noqa: PLC0415
+
+        return iter_request_texts(request)
 
     def _extract_urls(self, request: ChatCompletionRequest) -> list[str]:
         """Extract URLs found in any message content."""

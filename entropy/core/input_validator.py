@@ -99,13 +99,12 @@ class InputValidator:
 
     @staticmethod
     def _extract_all_text(request: ChatCompletionRequest) -> str:
-        """Concatenate all textual content from messages."""
-        parts: list[str] = []
-        for msg in request.messages:
-            if isinstance(msg.content, str):
-                parts.append(msg.content)
-            elif isinstance(msg.content, list):
-                for item in msg.content:
-                    if isinstance(item, dict) and item.get("type") == "text":
-                        parts.append(item.get("text", ""))
-        return "\n".join(parts)
+        """Concatenate all textual content from messages.
+
+        Covers plain, multipart text, image alt text, and function/tool-call
+        arguments so length and encoding checks see the same surfaces the
+        detection engine scans.
+        """
+        from entropy.core.content_extraction import extract_request_text  # noqa: PLC0415
+
+        return extract_request_text(request)
